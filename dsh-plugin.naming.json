@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "policy": "dsh-plugin-naming/v1",
+  "plugin": {
+    "namespace": "liao",
+    "name": "sidebar-organizer",
+    "coordinate": "liao/sidebar-organizer",
+    "packageName": "dsh-sidebar-organizer"
+  },
+  "names": {
+    "pluginNames": ["liao-sidebar-organizer"],
+    "loaderIds": ["liao-sidebar-organizer"],
+    "services": [],
+    "tools": [],
+    "commands": [],
+    "skills": [],
+    "skillProviders": [],
+    "events": [],
+    "settingsNamespaces": ["liao-sidebar-organizer"],
+    "routes": []
+  }
+}

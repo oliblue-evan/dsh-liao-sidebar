@@ -1,0 +1,74 @@
+{
+  "name": "dsh-sidebar-organizer",
+  "version": "0.1.1",
+  "description": "侧栏管家：整理侧栏入口、设置快捷键并添加自定义链接。",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "locale/zh.json",
+    "locale/en.json",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "dsh-plugin.naming.json"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "sidebar",
+    "navigation",
+    "shortcuts"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "oliblue-evan",
+  "homepage": "https://github.com/oliblue-evan/dsh-sidebar-organizer",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oliblue-evan/dsh-sidebar-organizer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oliblue-evan/dsh-sidebar-organizer/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "node --check lib/index.js && node --check lib/client.js",
+    "test": "node --test test/*.test.mjs",
+    "pack:check": "node test/package-check.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web"
+    },
+    "compatibility": {
+      "dshReleases": {
+        "0.2.0-rc.2": "compatible",
+        "0.2.1-rc.2": "compatible"
+      }
+    }
+  },
+  "packageManager": "pnpm@11.7.0",
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "playwright-core": "1.63.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}

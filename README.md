@@ -1,0 +1,28 @@
+# 侧栏管家
+
+侧栏管家帮助整理 DeepSeek Harness 的侧栏入口：除「插件」外，其他入口都可以收进「更多」，并可拖动排序、设置快捷键或添加自定义网页链接。自定义链接与侧栏入口共用「更多」中的排序，也可以从设置页上下调整。
+
+设置可在插件详情页的「侧栏管家设置」中调整。入口管理与自定义链接采用卡式分区，可逐项查看「侧栏显示／收在更多」状态、设置快捷键和调整顺序；窄屏会自动切换为单列布局。改动立即生效并保存在当前设备。首次与「插件书架」同时使用时，会导入书架中已有的侧栏顺序、收起项、快捷键和链接偏好；插件书架的其他功能与设置保持独立。
+
+当前页面位于「更多」内时，对应入口会显示在侧栏「更多」上方并保留原生选中态；直接在侧栏展开「更多」或切换到其他入口时移除，收起「更多」后会恢复显示。暂时被停用或重载的插件入口会保留原有位置和收起状态，恢复后不会跳回默认顺序。快捷键不能重复绑定；最多可设置 100 个快捷键和 30 个自定义链接。
+
+## 安装
+
+```sh
+dsh plugin --profile desktop add github:oliblue-evan/dsh-sidebar-organizer
+```
+
+也可以把 `https://raw.githubusercontent.com/oliblue-evan/dsh-plugin-index/main/index.json` 添加为 DSH 的自定义插件索引源。
+
+## 开发与检查
+
+```sh
+pnpm install
+pnpm check
+pnpm test
+pnpm pack:check
+```
+
+`pnpm test` 包含单元测试和使用本机 Chrome 的拖拽交互测试；没有 Chrome 时，浏览器测试会明确跳过。`pnpm pack:check` 另外验证打包产物能通过真实 DSH ClientModuleSystem 加载。
+
+当前兼容 DSH `0.2.0-rc.2` 与 `0.2.1-rc.2`。
