@@ -102,6 +102,30 @@ test("collapsed hover preview can be disabled and clicking inside keeps it float
   }
 });
 
+test("clicking the original open button during preview pins without double toggling", async () => {
+  const f = await fixture({ collapsed: true });
+  try {
+    const trigger = f.document.querySelector(
+      '[data-shell-leading] button[aria-label="打开侧边栏"]',
+    );
+    trigger.dispatchEvent(
+      new f.window.MouseEvent("pointerover", { bubbles: true }),
+    );
+    await sleep(220);
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
+    assert.equal(f.toggles(), 1);
+
+    trigger.click();
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
+    assert.equal(f.collapsed(), false);
+    assert.equal(f.toggles(), 1, "the click pins instead of toggling again");
+  } finally {
+    await f.close();
+  }
+});
+
 test("clicking the preview titlebar open button pins the normal expanded sidebar", async () => {
   const f = await fixture({ collapsed: true });
   try {
