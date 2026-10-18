@@ -1,6 +1,6 @@
 {
   "name": "dsh-liao-sidebar",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "侧栏管家：整理侧栏入口、设置快捷键并添加自定义链接。",
   "license": "MIT",
   "type": "module",
@@ -30,6 +30,7 @@
     "shortcuts"
   ],
   "engines": {
+    "dsh": ">=0.2.0-rc.2 <0.3.0-0",
     "node": ">=18"
   },
   "author": "oliblue-evan",
