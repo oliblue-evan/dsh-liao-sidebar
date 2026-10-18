@@ -68,26 +68,13 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
   }
 });
 
-test("conversation preview starts below the conversation header", async () => {
+test("preview preserves the collapsed titlebar clearance", async () => {
   const f = await fixture({ collapsed: true });
   try {
-    const center = f.document.createElement("div"),
-      slot = f.document.createElement("div"),
-      header = f.document.createElement("header"),
-      leading = f.frame.querySelector("[data-shell-leading]");
-    center.className = "center";
-    slot.setAttribute("data-slot", "conversation.header");
-    slot.appendChild(header);
-    center.appendChild(slot);
-    f.frame.insertBefore(center, leading);
-    header.getBoundingClientRect = () => ({
-      left: 0,
-      top: 0,
-      right: 600,
-      bottom: 76,
-      width: 600,
-      height: 76,
-    });
+    const style = f.document.createElement("style");
+    style.textContent =
+      "[data-sidebar-collapsed]{--dsh-frame-leading-clearance:160px}";
+    f.document.head.appendChild(style);
 
     f.document
       .querySelector('[data-shell-leading] button[aria-label="打开侧边栏"]')
@@ -99,9 +86,20 @@ test("conversation preview starts below the conversation header", async () => {
 
     assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
     assert.equal(
-      parseInt(f.frame.style.getPropertyValue("--lso-peek-top"), 10),
-      84,
-      "the floating preview clears the conversation tab header",
+      f.frame.style.getPropertyValue("--dsh-frame-leading-clearance"),
+      "160px",
+      "the page title keeps the space occupied by the collapsed controls",
+    );
+
+    f.document.body.dispatchEvent(
+      new f.window.MouseEvent("pointermove", { bubbles: true }),
+    );
+    await sleep(220);
+    await f.flush();
+    assert.equal(
+      f.frame.style.getPropertyValue("--dsh-frame-leading-clearance"),
+      "",
+      "the host stylesheet takes the preview-only clearance back",
     );
   } finally {
     await f.close();
