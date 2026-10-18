@@ -115,6 +115,62 @@ test("preview preserves the collapsed titlebar clearance", async () => {
   }
 });
 
+test("preview fades and slides both in and out", async () => {
+  const f = await fixture({ collapsed: true });
+  const animations = [];
+  try {
+    f.column.animate = function (frames, options) {
+      let finish;
+      const animation = {
+        frames,
+        options,
+        finished: new Promise((resolve) => {
+          finish = resolve;
+        }),
+        cancel() {},
+        finish,
+      };
+      animations.push(animation);
+      return animation;
+    };
+
+    f.document
+      .querySelector('[data-shell-leading] button[aria-label="打开侧边栏"]')
+      .dispatchEvent(
+        new f.window.MouseEvent("pointerover", { bubbles: true }),
+      );
+    await sleep(220);
+    await f.flush();
+
+    assert.equal(animations.length, 1);
+    assert.equal(animations[0].options.duration, 180);
+    assert.equal(animations[0].frames[0].opacity, 0);
+    assert.equal(animations[0].frames[0].translate, "-10px 0px");
+
+    f.document.body.dispatchEvent(
+      new f.window.MouseEvent("pointermove", { bubbles: true }),
+    );
+    await sleep(220);
+    assert.equal(animations.length, 2);
+    assert.equal(animations[1].options.duration, 120);
+    assert.equal(animations[1].frames[1].opacity, 0);
+    assert.equal(animations[1].frames[1].translate, "-6px 0px");
+    assert.equal(
+      f.column.hasAttribute("data-lso-peek-closing"),
+      true,
+      "the preview stays mounted while its exit animation runs",
+    );
+
+    animations[1].finish();
+    await sleep(0);
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
+    assert.equal(f.column.hasAttribute("data-lso-peek-closing"), false);
+  } finally {
+    await f.close();
+  }
+});
+
 test("collapsing the host while previewing removes the floating overlay", async () => {
   const f = await fixture({ collapsed: true });
   try {
