@@ -74,6 +74,7 @@ test("collapsed pages are detected and fixed, then honor their switches", async 
         nav{display:flex;flex-direction:column;width:280px}
         nav button{height:36px}
         #center{display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden}
+        #slot{height:0}
         #page{height:100%;padding:14px 16px 16px;background:#191919}
         h1{margin:0;font-size:20px}
       </style></head>
@@ -83,7 +84,7 @@ test("collapsed pages are detected and fixed, then honor their switches", async 
             <button aria-label="技能中心" aria-current="page">技能中心</button>
             <button aria-label="SSH">SSH</button>
           </nav></div>
-          <div id="center"><div id="page"><h1>技能中心</h1></div></div>
+          <div id="center"><div id="slot" data-slot="main"><div id="page"><h1>技能中心</h1></div></div></div>
         </div>
       </body></html>`);
   });
