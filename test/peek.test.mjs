@@ -115,6 +115,68 @@ test("preview preserves the collapsed titlebar clearance", async () => {
   }
 });
 
+test("the floating sidebar keeps its native width on narrow windows", async () => {
+  const f = await fixture({ collapsed: true });
+  try {
+    Object.defineProperty(f.window, "innerWidth", {
+      configurable: true,
+      value: 747,
+    });
+    Object.defineProperty(f.window, "innerHeight", {
+      configurable: true,
+      value: 900,
+    });
+    f.column.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      right: 280,
+      bottom: 900,
+      width: 280,
+      height: 900,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    });
+
+    f.document
+      .querySelector('[data-shell-leading] button[aria-label="打开侧边栏"]')
+      .dispatchEvent(
+        new f.window.MouseEvent("pointerover", { bubbles: true }),
+      );
+    await sleep(220);
+    await f.flush();
+    assert.equal(
+      f.frame.style.getPropertyValue("--lso-peek-width"),
+      "280px",
+      "the preview follows the real sidebar width instead of shrinking to 260px",
+    );
+
+    Object.defineProperty(f.window, "innerWidth", {
+      configurable: true,
+      value: 400,
+    });
+    Object.defineProperty(f.window, "innerHeight", {
+      configurable: true,
+      value: 300,
+    });
+    f.window.dispatchEvent(new f.window.Event("resize"));
+    await sleep(50);
+    await f.flush();
+    assert.equal(
+      f.frame.style.getPropertyValue("--lso-peek-width"),
+      "280px",
+      "narrow windows keep the minimum width instead of introducing horizontal scrolling",
+    );
+    assert.ok(
+      parseInt(f.frame.style.getPropertyValue("--lso-peek-height"), 10) <=
+        300,
+      "the preview height stays within the viewport",
+    );
+  } finally {
+    await f.close();
+  }
+});
+
 test("preview fades and slides both in and out", async () => {
   const f = await fixture({ collapsed: true });
   const animations = [];
