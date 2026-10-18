@@ -131,6 +131,9 @@ test("the promoted hidden panel persists until another entry is selected or More
     const hidden = f.document.querySelector(
       'nav button[aria-label="技能中心"]',
     );
+    Array.from(hidden.children)
+      .find((node) => node.textContent.trim() === "技能中心")
+      ?.remove();
     const promoted = () =>
       f.document.querySelector('nav > [data-lso-selection="skills"]');
     let clicked = 0;
@@ -182,6 +185,10 @@ test("the promoted hidden panel persists until another entry is selected or More
       "the promoted row remains while the hover preview is open",
     );
     assert.equal(proxy.textContent.trim(), "技能中心");
+    assert.ok(
+      proxy.querySelector("[data-lso-current-label]"),
+      "the promoted row restores the name when the host only exposes it through its own renderer",
+    );
     assert.equal(proxy.getAttribute("aria-current"), "page");
     assert.equal(proxy.hasAttribute("data-lso-entry"), false);
     assert.equal(proxy.nextElementSibling, trigger);
