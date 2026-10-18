@@ -29,20 +29,25 @@ test("real Chromium keeps More visible and renders one anchored drag line", asyn
         nav{display:flex;flex-direction:column;gap:4px;width:280px;padding:12px;box-sizing:border-box;background:#2c2c2e}
         nav button{display:flex;align-items:center;gap:8px;min-height:36px;margin:0 2px;padding:7px 8px;border:0;border-radius:12px;background:transparent;color:inherit;font:inherit;text-align:left}
       </style></head><body>
-        <nav aria-label="全局面板">
-          ${[
-            ["插件", "plugins"],
-            ["技能中心", "skills"],
-            ["上下文洞察", "context"],
-            ["自动化任务", "schedule"],
-            ["SSH", "ssh"],
-          ]
-            .map(
-              ([label]) =>
-                `<button aria-label="${label}"><span aria-hidden="true">◆</span><span>${label}</span></button>`,
-            )
-            .join("")}
-        </nav>
+        <div data-sidebar-collapsed style="display:flex;align-items:flex-start">
+          <div id="sidebar-column" style="flex:none">
+            <nav aria-label="全局面板">
+              ${[
+                ["插件", "plugins"],
+                ["技能中心", "skills"],
+                ["上下文洞察", "context"],
+                ["自动化任务", "schedule"],
+                ["SSH", "ssh"],
+              ]
+                .map(
+                  ([label]) =>
+                    `<button aria-label="${label}"><span aria-hidden="true">◆</span><span>${label}</span></button>`,
+                )
+                .join("")}
+            </nav>
+          </div>
+          <main id="center" style="flex:1;min-height:100vh"></main>
+        </div>
       </body></html>`);
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));

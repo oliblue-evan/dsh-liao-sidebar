@@ -12,92 +12,142 @@ async function using(options, fn) {
   }
 }
 
-test("More expands in place, preserves selected state, and collapsed hover menu matches the native row width", async () =>
-  using({ config: { more: ["skills", "context"] } }, async (f) => {
-    const plugin = f.document.querySelector('nav button[aria-label="插件"]');
-    assert.equal(
-      plugin.hasAttribute("data-lso-entry"),
-      false,
-      "Plugins remains outside More",
-    );
-    const hidden = f.document.querySelector(
-      'nav button[aria-label="技能中心"]',
-    );
-    assert.equal(hidden.style.display, "none");
-    const trigger = f.document.querySelector("[data-lso-trigger]");
-    await f.click("[data-lso-trigger]");
-    const menu = f.document.querySelector(".lso-menu");
-    assert.equal(menu.hidden, false);
-    assert.equal(menu.querySelectorAll("[data-lso-entry]").length, 2);
-    assert.match(
-      f.document.querySelector('.lso-menu [data-lso-entry="skills"]').outerHTML,
-      /lso-item/,
-    );
-    f.document
-      .querySelector('nav button[aria-label="上下文洞察"]')
-      .setAttribute("aria-current", "page");
-    f.document
-      .querySelector(".lso-menu")
-      .dispatchEvent(new f.window.MouseEvent("mouseleave"));
-    await f.click("[data-lso-trigger]");
-    f.document.querySelector("nav").style.background = "rgb(46, 46, 46)";
-    trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
-    const popover = f.document.querySelector(".lso-popover");
-    assert.equal(popover.hidden, false);
-    assert.equal(popover.children.length, 3);
-    assert.equal(
-      popover.style.getPropertyValue("--lso-popover-bg"),
-      "rgb(46, 46, 46)",
-      "the popup samples the covering sidebar surface",
-    );
-    assert.equal(
-      popover
-        .querySelector('[data-lso-entry="context"]')
-        .getAttribute("data-lso-selected"),
-      "true",
-    );
-    const popupRow = popover.querySelector('[data-lso-entry="skills"]');
-    const nativeRow = f.document.querySelector(
-      'nav button[aria-label="技能中心"]',
-    );
-    assert.equal(
-      popupRow.style.paddingLeft,
-      f.window.getComputedStyle(nativeRow).paddingLeft,
-      "the popup keeps the native row inline padding",
-    );
-    assert.equal(
-      popupRow.style.margin,
-      "0px 2px",
-      "the popup keeps the native row inline margins",
-    );
-    const dragHint = popover.querySelector(".lso-popover-hint");
-    assert.equal(dragHint.textContent, "拖拽入口或链接可自定义排序");
-    assert.equal(dragHint.getAttribute("role"), "note");
-    assert.equal(dragHint, popover.lastElementChild);
-    assert.equal(dragHint.style.order, "999999");
-    assert.equal(f.window.getComputedStyle(dragHint).pointerEvents, "none");
-    const pluginCss = f.document.querySelector("[data-lso-style]").textContent;
-    assert.match(
-      pluginCss,
-      /\.lso-popover\{[^}]*padding:8px 12px 4px;[^}]*background:var\(--lso-popover-bg,var\(--dsw-alias-bg-layer-2/,
-      "the popup has a roomier top inset and uses the sampled sidebar surface",
-    );
-    assert.match(
-      pluginCss,
-      /\.lso-popover::before\{content:none\}/,
-      "no extra menu tint is layered over the sidebar surface",
-    );
-    assert.match(
-      pluginCss,
-      /\.lso-popover-hint\{[^}]*gap:6px;margin:3px 2px 0;padding:6px 8px[^}]*font-size:11px/,
-      "the footer hint shares the sidebar row insets",
-    );
-    assert.equal(
-      popover.style.width,
-      "260px",
-      "when host layout is unavailable the popover uses its native sidebar width fallback",
-    );
-  }));
+test("More expands in place, restores entry names, and never floats while the sidebar is open", async () =>
+  using(
+    {
+      config: { more: ["skills", "context"] },
+      hideMoreLabels: true,
+    },
+    async (f) => {
+      const plugin = f.document.querySelector('nav button[aria-label="插件"]');
+      assert.equal(
+        plugin.hasAttribute("data-lso-entry"),
+        false,
+        "Plugins remains outside More",
+      );
+      const hidden = f.document.querySelector(
+        'nav button[aria-label="技能中心"]',
+      );
+      assert.equal(hidden.style.display, "none");
+      const trigger = f.document.querySelector("[data-lso-trigger]");
+      await f.click("[data-lso-trigger]");
+      const menu = f.document.querySelector(".lso-menu");
+      assert.equal(menu.hidden, false);
+      assert.equal(menu.querySelectorAll("[data-lso-entry]").length, 2);
+      const skills = menu.querySelector('[data-lso-entry="skills"]');
+      assert.match(skills.outerHTML, /lso-item/);
+      assert.equal(
+        skills.querySelector(".lso-item-label").textContent,
+        "技能中心",
+        "the cloned row supplies its own name when the host hides entry text",
+      );
+      assert.equal(
+        skills.textContent.trim(),
+        "技能中心",
+        "the cloned row never duplicates its name",
+      );
+      f.document
+        .querySelector('nav button[aria-label="上下文洞察"]')
+        .setAttribute("aria-current", "page");
+      await f.flush();
+      assert.equal(
+        f.document.querySelector('nav > [data-lso-selection="context"]'),
+        null,
+        "an open inline More never duplicates the newly selected entry",
+      );
+      await f.click("[data-lso-trigger]");
+      assert.ok(
+        f.document.querySelector('nav > [data-lso-selection="context"]'),
+        "the selected hidden entry is promoted after closing More",
+      );
+      trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      assert.equal(
+        f.document.querySelector(".lso-popover"),
+        null,
+        "an expanded sidebar uses its inline More rows instead of a floating menu",
+      );
+    },
+  ));
+
+test("the collapsed hover menu keeps readable labels, selected state, and the native row width", async () =>
+  using(
+    {
+      collapsed: true,
+      config: { more: ["skills", "context"] },
+      hideMoreLabels: true,
+    },
+    async (f) => {
+      f.document
+        .querySelector('nav button[aria-label="上下文洞察"]')
+        .setAttribute("aria-current", "page");
+      await f.flush();
+      f.document.querySelector("nav").style.background = "rgb(46, 46, 46)";
+      const trigger = f.document.querySelector("[data-lso-trigger]");
+      trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      const popover = f.document.querySelector(".lso-popover");
+      assert.equal(popover.hidden, false);
+      assert.equal(popover.children.length, 3);
+      assert.equal(
+        popover.style.getPropertyValue("--lso-popover-bg"),
+        "rgb(46, 46, 46)",
+        "the popup samples the covering sidebar surface",
+      );
+      assert.equal(
+        popover
+          .querySelector('[data-lso-entry="context"]')
+          .getAttribute("data-lso-selected"),
+        "true",
+      );
+      const popupRow = popover.querySelector('[data-lso-entry="skills"]');
+      assert.equal(
+        popupRow.querySelector(".lso-item-label").textContent,
+        "技能中心",
+      );
+      assert.equal(
+        popupRow.style.paddingLeft,
+        "12px",
+        "the popup gives the label room even when the rail row has no padding",
+      );
+      assert.equal(
+        popupRow.style.margin,
+        "0px 2px",
+        "the popup keeps the native row inline margins",
+      );
+      const dragHint = popover.querySelector(".lso-popover-hint");
+      assert.equal(dragHint.textContent, "拖拽入口或链接可自定义排序");
+      assert.equal(dragHint.getAttribute("role"), "note");
+      assert.equal(dragHint, popover.lastElementChild);
+      assert.equal(dragHint.style.order, "999999");
+      assert.equal(f.window.getComputedStyle(dragHint).pointerEvents, "none");
+      const pluginCss = f.document.querySelector("[data-lso-style]").textContent;
+      assert.match(
+        pluginCss,
+        /\.lso-popover\{[^}]*padding:8px 12px 4px;[^}]*background:var\(--lso-popover-bg,var\(--dsw-alias-bg-layer-2/,
+        "the popup has a roomier top inset and uses the sampled sidebar surface",
+      );
+      assert.match(
+        pluginCss,
+        /\.lso-popover::before\{content:none\}/,
+        "no extra menu tint is layered over the sidebar surface",
+      );
+      assert.match(
+        pluginCss,
+        /\.lso-popover-hint\{[^}]*gap:6px;margin:3px 2px 0;padding:6px 8px[^}]*font-size:11px/,
+        "the footer hint shares the sidebar row insets",
+      );
+      assert.equal(
+        popover.style.width,
+        "260px",
+        "when host layout is unavailable the popover uses its native sidebar width fallback",
+      );
+      await f.click('.lso-popover [data-lso-entry="skills"]');
+      assert.equal(
+        f.document.querySelector(".lso-popover"),
+        null,
+        "choosing an entry closes the floating menu",
+      );
+    },
+  ));
 
 test("a transient empty slot snapshot does not erase saved order or More preferences", async () =>
   using(
@@ -182,54 +232,27 @@ test("the promoted hidden panel persists until another entry is selected or More
     const proxy = promoted();
     assert.ok(
       proxy,
-      "the promoted row remains while the hover preview is open",
+      "the promoted row remains while the pointer is over More",
     );
     assert.equal(proxy.textContent.trim(), "技能中心");
     assert.ok(
       proxy.querySelector("[data-lso-current-label]"),
-      "the promoted row restores the name when the host only exposes it through its own renderer",
+      "the promoted row supplies its own name",
     );
     assert.equal(proxy.getAttribute("aria-current"), "page");
     assert.equal(proxy.hasAttribute("data-lso-entry"), false);
     assert.equal(proxy.nextElementSibling, trigger);
     assert.equal(trigger.getAttribute("data-lso-active"), "false");
     assert.equal(trigger.hasAttribute("aria-current"), false);
-    assert.ok(f.document.querySelector(".lso-popover"));
-
-    trigger.dispatchEvent(new f.window.MouseEvent("mouseleave"));
-    proxy.dispatchEvent(new f.window.MouseEvent("mouseenter"));
-    await new Promise((resolve) => setTimeout(resolve, 180));
-    assert.ok(
-      f.document.querySelector(".lso-popover"),
-      "moving from More onto the promoted row does not close the preview",
-    );
     assert.equal(
-      promoted(),
-      proxy,
-      "the promoted row stays mounted while the pointer is over it",
+      f.document.querySelector(".lso-popover"),
+      null,
+      "an expanded sidebar never opens the floating More menu",
     );
-
     await f.click('nav > [data-lso-selection="skills"]');
     assert.equal(clicked, 1, "the promoted row opens the native panel");
     assert.equal(f.document.querySelector(".lso-popover"), null);
     assert.ok(promoted(), "clicking the promoted row does not remove it");
-    trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
-    assert.ok(f.document.querySelector(".lso-popover"));
-    assert.ok(promoted());
-    await act(async () =>
-      f.document.dispatchEvent(
-        new f.window.KeyboardEvent("keydown", {
-          key: "Escape",
-          bubbles: true,
-          cancelable: true,
-        }),
-      ),
-    );
-    assert.equal(f.document.querySelector(".lso-popover"), null);
-    assert.ok(
-      promoted(),
-      "closing the hover preview leaves the promoted row in place",
-    );
     assert.equal(trigger.getAttribute("aria-expanded"), "false");
 
     const visible = f.document.querySelector(
@@ -276,6 +299,133 @@ test("alternate host selection markers refresh the promoted row", async () =>
     });
     assert.equal(promoted(), null);
   }));
+
+test("a promoted rail row keeps its icon width and the floating menu widens enough to read names", async () =>
+  using(
+    {
+      collapsed: true,
+      config: { more: ["skills"] },
+      hideMoreLabels: true,
+    },
+    async (f) => {
+      const nav = f.document.querySelector("nav");
+      const hidden = f.document.querySelector(
+        'nav button[aria-label="技能中心"]',
+      );
+      const rect = (width) => ({
+        left: 10,
+        top: 100,
+        right: 10 + width,
+        bottom: 136,
+        width,
+        height: 36,
+        x: 10,
+        y: 100,
+        toJSON() {},
+      });
+      nav.getBoundingClientRect = () => rect(0);
+      hidden.getBoundingClientRect = () => rect(36);
+      hidden.setAttribute("aria-current", "page");
+      await f.flush();
+      const proxy = f.document.querySelector(
+        'nav > [data-lso-selection="skills"]',
+      );
+      assert.ok(proxy);
+      assert.equal(
+        proxy.style.getPropertyValue("width"),
+        "36px",
+        "the promoted row keeps the source icon button width instead of collapsing to zero",
+      );
+      assert.equal(proxy.style.getPropertyValue("min-width"), "36px");
+      assert.equal(proxy.style.getPropertyValue("max-width"), "36px");
+      const label = proxy.querySelector("[data-lso-current-label]");
+      assert.equal(label.textContent, "技能中心");
+      assert.equal(
+        label.hasAttribute("hidden"),
+        true,
+        "the rail keeps the promoted row icon-only",
+      );
+      assert.ok(proxy.querySelector("svg"), "the promoted row keeps its icon");
+
+      const trigger = f.document.querySelector("[data-lso-trigger]");
+      trigger.getBoundingClientRect = () => rect(36);
+      trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      const popover = f.document.querySelector(".lso-popover");
+      assert.ok(popover);
+      assert.equal(
+        popover.style.width,
+        "240px",
+        "the floating menu is wide enough for entry names",
+      );
+      assert.equal(
+        popover.querySelector('[data-lso-entry="skills"] .lso-item-label')
+          .textContent,
+        "技能中心",
+      );
+    },
+  ));
+
+test("moving from the floating More menu onto the promoted row does not close it or flicker", async () =>
+  using(
+    {
+      collapsed: true,
+      config: { more: ["skills"] },
+      hideMoreLabels: true,
+    },
+    async (f) => {
+      const hidden = f.document.querySelector(
+        'nav button[aria-label="技能中心"]',
+      );
+      let clicked = 0;
+      hidden.addEventListener("click", () => clicked++);
+      hidden.setAttribute("aria-current", "page");
+      await f.flush();
+      const trigger = f.document.querySelector("[data-lso-trigger]");
+      trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      const proxy = f.document.querySelector(
+        'nav > [data-lso-selection="skills"]',
+      );
+      assert.ok(proxy);
+      assert.ok(f.document.querySelector(".lso-popover"));
+
+      trigger.dispatchEvent(new f.window.MouseEvent("mouseleave"));
+      proxy.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      await new Promise((resolve) => setTimeout(resolve, 180));
+      assert.ok(
+        f.document.querySelector(".lso-popover"),
+        "the pointer crossing onto the promoted row keeps the menu open",
+      );
+      assert.equal(
+        f.document.querySelector('nav > [data-lso-selection="skills"]'),
+        proxy,
+      );
+
+      await f.click('nav > [data-lso-selection="skills"]');
+      assert.equal(clicked, 1);
+      assert.equal(f.document.querySelector(".lso-popover"), null);
+      assert.ok(
+        f.document.querySelector('nav > [data-lso-selection="skills"]'),
+        "the promoted row stays after it is selected",
+      );
+
+      trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      assert.ok(f.document.querySelector(".lso-popover"));
+      await act(async () =>
+        f.document.dispatchEvent(
+          new f.window.KeyboardEvent("keydown", {
+            key: "Escape",
+            bubbles: true,
+            cancelable: true,
+          }),
+        ),
+      );
+      assert.equal(f.document.querySelector(".lso-popover"), null);
+      assert.ok(
+        f.document.querySelector('nav > [data-lso-selection="skills"]'),
+        "Escape closes the menu without removing the promoted row",
+      );
+    },
+  ));
 
 test("More stays absent by default, appears during drag as a drop target, and is created on first drop", async () =>
   using({}, async (f) => {
@@ -338,7 +488,10 @@ test("More stays absent by default, appears during drag as a drop target, and is
 
 test("a fixed sidebar entry accepts drags from More so the only remaining row can pull entries back out", async () =>
   using(
-    { config: { more: ["skills", "context", "schedule", "ssh"] } },
+    {
+      collapsed: true,
+      config: { more: ["skills", "context", "schedule", "ssh"] },
+    },
     async (f) => {
       const trigger = f.document.querySelector("[data-lso-trigger]");
       const plugin = f.document.querySelector('nav button[aria-label="插件"]');
@@ -463,7 +616,7 @@ test("a fixed sidebar entry accepts drags from More so the only remaining row ca
   ));
 
 test("dragging from the floating More menu keeps the original row dimmed instead of rebuilding it", async () =>
-  using({ config: { more: ["skills"] } }, async (f) => {
+  using({ collapsed: true, config: { more: ["skills"] } }, async (f) => {
     const trigger = f.document.querySelector("[data-lso-trigger]");
     trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
     const row = f.document.querySelector(

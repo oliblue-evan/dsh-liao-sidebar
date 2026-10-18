@@ -43,9 +43,19 @@ export async function fixture({
   loaderSource,
   slotEntries = entries,
   collapsed = false,
+  hideMoreLabels = false,
 } = {}) {
   const liveEntries = slotEntries.slice();
-  const nav = `<nav aria-label="全局面板">${liveEntries.map((entry) => `<button aria-label="${entry.options.label}"><svg><path d="M0 0"></path></svg><span>${entry.options.label}</span></button>`).join("")}</nav>`;
+  const hiddenIds = new Set((config && config.more) || []);
+  const nav = `<nav aria-label="全局面板">${liveEntries
+    .map((entry) => {
+      const label =
+        hideMoreLabels && hiddenIds.has(entry.options.id)
+          ? ""
+          : `<span>${entry.options.label}</span>`;
+      return `<button aria-label="${entry.options.label}"><svg><path d="M0 0"></path></svg>${label}</button>`;
+    })
+    .join("")}</nav>`;
   const shell = collapsed
     ? `<div data-test-frame data-sidebar-collapsed><div data-test-column><div data-window-drag><button aria-label="收起侧边栏"></button></div>${nav}</div><div data-shell-leading><button aria-label="打开侧边栏"></button><button aria-label="新建会话"></button></div></div>`
     : nav;
