@@ -12,7 +12,7 @@ async function using(options, fn) {
   }
 }
 
-test("More expands in place, restores entry names, and never floats while the sidebar is open", async () =>
+test("More expands in place, restores entry names, and previews on hover while the sidebar is open", async () =>
   using(
     {
       config: { more: ["skills", "context"] },
@@ -61,10 +61,16 @@ test("More expands in place, restores entry names, and never floats while the si
         "the selected hidden entry is promoted after closing More",
       );
       trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      const popover = f.document.querySelector(".lso-popover");
+      assert.ok(
+        popover,
+        "hovering More while the sidebar is open shows the floating preview",
+      );
       assert.equal(
-        f.document.querySelector(".lso-popover"),
-        null,
-        "an expanded sidebar uses its inline More rows instead of a floating menu",
+        popover.querySelector('[data-lso-entry="skills"] .lso-item-label')
+          .textContent,
+        "技能中心",
+        "the floating preview keeps readable entry names",
       );
     },
   ));
@@ -141,10 +147,14 @@ test("the collapsed hover menu keeps readable labels, selected state, and the na
         "when host layout is unavailable the popover uses its native sidebar width fallback",
       );
       await f.click('.lso-popover [data-lso-entry="skills"]');
-      assert.equal(
+      assert.ok(
         f.document.querySelector(".lso-popover"),
-        null,
-        "choosing an entry closes the floating menu",
+        "choosing an entry keeps the floating menu open",
+      );
+      await f.click('.lso-popover [data-lso-entry="context"]');
+      assert.ok(
+        f.document.querySelector(".lso-popover"),
+        "the floating menu stays open for consecutive switches",
       );
     },
   ));
@@ -244,10 +254,9 @@ test("the promoted hidden panel persists until another entry is selected or More
     assert.equal(proxy.nextElementSibling, trigger);
     assert.equal(trigger.getAttribute("data-lso-active"), "false");
     assert.equal(trigger.hasAttribute("aria-current"), false);
-    assert.equal(
+    assert.ok(
       f.document.querySelector(".lso-popover"),
-      null,
-      "an expanded sidebar never opens the floating More menu",
+      "hovering More while the sidebar is open shows the floating menu",
     );
     await f.click('nav > [data-lso-selection="skills"]');
     assert.equal(clicked, 1, "the promoted row opens the native panel");

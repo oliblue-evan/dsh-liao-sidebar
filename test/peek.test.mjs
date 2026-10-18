@@ -292,3 +292,42 @@ test("clicking the preview titlebar open button pins the normal expanded sidebar
     await f.close();
   }
 });
+
+test("pinning the preview clears a floating More menu first", async () => {
+  const f = await fixture({
+    collapsed: true,
+    config: { more: ["skills"] },
+  });
+  try {
+    f.document
+      .querySelector('[data-shell-leading] button[aria-label="打开侧边栏"]')
+      .dispatchEvent(
+        new f.window.MouseEvent("pointerover", { bubbles: true }),
+      );
+    await sleep(220);
+    await f.flush();
+
+    const trigger = f.document.querySelector("[data-lso-trigger]");
+    assert.ok(trigger);
+    trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+    assert.ok(
+      f.document.querySelector(".lso-popover"),
+      "the preview sidebar still supports the More hover menu",
+    );
+
+    f.document
+      .querySelector(
+        '[data-lso-peek-leading] button[aria-label="打开侧边栏"]',
+      )
+      .click();
+    await f.flush();
+    assert.equal(
+      f.document.querySelector(".lso-popover"),
+      null,
+      "pinning the normal sidebar removes the floating menu",
+    );
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
+  } finally {
+    await f.close();
+  }
+});
