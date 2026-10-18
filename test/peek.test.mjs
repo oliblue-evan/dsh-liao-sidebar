@@ -20,6 +20,7 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
       false,
       "the collapsed rail is never frozen as the preview",
     );
+    f.document.querySelector("[data-shell-leading]").remove();
     await f.flush();
     assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
     assert.equal(f.column.hasAttribute("data-lso-peek-column"), true);
@@ -32,6 +33,14 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
     assert.equal(
       f.document.querySelectorAll("[data-lso-peek-leading]").length,
       1,
+    );
+    assert.deepEqual(
+      Array.from(
+        f.document.querySelectorAll("[data-lso-peek-leading] button"),
+        (button) => button.getAttribute("aria-label"),
+      ),
+      ["打开侧边栏", "新建会话"],
+      "both host controls are cloned before the host removes them",
     );
     const peekTop = parseInt(
         f.frame.style.getPropertyValue("--lso-peek-top"),
