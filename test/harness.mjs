@@ -47,7 +47,7 @@ export async function fixture({
   const liveEntries = slotEntries.slice();
   const nav = `<nav aria-label="全局面板">${liveEntries.map((entry) => `<button aria-label="${entry.options.label}"><svg><path d="M0 0"></path></svg><span>${entry.options.label}</span></button>`).join("")}</nav>`;
   const shell = collapsed
-    ? `<div data-test-frame data-sidebar-collapsed><div data-test-column>${nav}</div><div data-shell-leading><button aria-label="打开侧边栏"></button><button aria-label="新建会话"></button></div></div>`
+    ? `<div data-test-frame data-sidebar-collapsed><div data-test-column><div data-window-drag><button aria-label="收起侧边栏"></button></div>${nav}</div><div data-shell-leading><button aria-label="打开侧边栏"></button><button aria-label="新建会话"></button></div></div>`
     : nav;
   const dom = new JSDOM(
     `<html lang="zh"><head></head><body>${shell}<main id="settings"></main></body></html>`,
