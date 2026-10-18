@@ -151,15 +151,21 @@ test("collapsed pages are detected and fixed, then honor their switches", async 
       const center = document.querySelector("#center");
       return {
         paddingTop: getComputedStyle(center).paddingTop,
-        base: center.style.getPropertyValue("--lso-page-fix-base"),
+        paddingRight: getComputedStyle(center).paddingRight,
+        paddingBottom: getComputedStyle(center).paddingBottom,
+        paddingLeft: getComputedStyle(center).paddingLeft,
+        baseTop: center.style.getPropertyValue("--lso-page-fix-base-top"),
         titleTop: document.querySelector("#page h1").getBoundingClientRect().top,
       };
     });
-    assert.equal(state.base, "0px");
-    assert.equal(state.paddingTop, "48px");
+    assert.equal(state.baseTop, "0px");
+    assert.equal(state.paddingTop, "62px");
+    assert.equal(state.paddingRight, "24px");
+    assert.equal(state.paddingBottom, "48px");
+    assert.equal(state.paddingLeft, "24px");
     assert.ok(
-      state.titleTop >= 48,
-      "the title moves below the macOS window safe area",
+      state.titleTop >= 76,
+      "the title follows the official 28px plus safe-area top spacing",
     );
 
     await page.evaluate(() =>
@@ -174,6 +180,18 @@ test("collapsed pages are detected and fixed, then honor their switches", async 
       ),
       "0px",
       "expanding the sidebar removes the temporary fix",
+    );
+    assert.equal(
+      await page.evaluate(() => {
+        const style = getComputedStyle(document.querySelector("#center"));
+        return [
+          style.paddingRight,
+          style.paddingBottom,
+          style.paddingLeft,
+        ].join(",");
+      }),
+      "0px,0px,0px",
+      "expanding the sidebar restores all temporary spacing",
     );
 
     await page.evaluate(() =>
