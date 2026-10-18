@@ -87,3 +87,31 @@ test("collapsed hover preview can be disabled and clicking inside pins the sideb
     await f.close();
   }
 });
+
+test("clicking the preview titlebar open button pins the normal expanded sidebar", async () => {
+  const f = await fixture({ collapsed: true });
+  try {
+    f.document
+      .querySelector('[data-shell-leading] button[aria-label="打开侧边栏"]')
+      .dispatchEvent(
+        new f.window.MouseEvent("pointerover", { bubbles: true }),
+      );
+    await sleep(220);
+    await f.flush();
+    const cloneOpen = f.document.querySelector(
+      '[data-lso-peek-leading] button[aria-label="打开侧边栏"]',
+    );
+    cloneOpen.click();
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
+    assert.equal(f.column.hasAttribute("data-lso-peek-column"), false);
+    assert.equal(
+      f.document.querySelectorAll("[data-lso-peek-leading]").length,
+      0,
+    );
+    assert.equal(f.toggles(), 1);
+    assert.equal(f.collapsed(), false);
+  } finally {
+    await f.close();
+  }
+});
