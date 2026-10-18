@@ -124,6 +124,16 @@ export async function fixture({
   let toggleCount = 0;
   if (frame) {
     const trigger = frame.querySelector("[data-shell-leading] button");
+    const leading = frame.querySelector("[data-shell-leading]");
+    if (leading)
+      leading.getBoundingClientRect = () => ({
+        left: 80,
+        top: 8,
+        right: 160,
+        bottom: 40,
+        width: 80,
+        height: 32,
+      });
     if (trigger)
       trigger.getBoundingClientRect = () => ({
         left: 88,

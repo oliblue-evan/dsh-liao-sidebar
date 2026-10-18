@@ -23,6 +23,10 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
     );
     const strip = f.column.querySelector("[data-window-drag]");
     assert.equal(strip.hasAttribute("data-lso-peek-hidden"), true);
+    assert.equal(
+      f.document.querySelectorAll("[data-lso-peek-leading]").length,
+      1,
+    );
     assert.equal(f.toggles(), 1);
     assert.equal(f.collapsed(), false);
 
@@ -34,6 +38,10 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
     assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
     assert.equal(f.column.hasAttribute("data-lso-peek-column"), false);
     assert.equal(strip.hasAttribute("data-lso-peek-hidden"), false);
+    assert.equal(
+      f.document.querySelectorAll("[data-lso-peek-leading]").length,
+      0,
+    );
     assert.equal(f.toggles(), 2);
     assert.equal(f.collapsed(), true);
   } finally {
