@@ -14,6 +14,12 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
       new f.window.MouseEvent("pointerover", { bubbles: true }),
     );
     await sleep(220);
+    assert.equal(f.collapsed(), false, "the host expands before the overlay");
+    assert.equal(
+      f.frame.hasAttribute("data-lso-peek"),
+      false,
+      "the collapsed rail is never frozen as the preview",
+    );
     await f.flush();
     assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
     assert.equal(f.column.hasAttribute("data-lso-peek-column"), true);
@@ -57,6 +63,36 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
     );
     assert.equal(f.toggles(), 2);
     assert.equal(f.collapsed(), true);
+  } finally {
+    await f.close();
+  }
+});
+
+test("collapsing the host while previewing removes the floating overlay", async () => {
+  const f = await fixture({ collapsed: true });
+  try {
+    f.document
+      .querySelector('[data-shell-leading] button[aria-label="打开侧边栏"]')
+      .dispatchEvent(
+        new f.window.MouseEvent("pointerover", { bubbles: true }),
+      );
+    await sleep(220);
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
+    assert.equal(
+      f.document.querySelectorAll("[data-lso-peek-leading]").length,
+      1,
+    );
+
+    f.frame.setAttribute("data-sidebar-collapsed", "");
+    await sleep(0);
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
+    assert.equal(f.column.hasAttribute("data-lso-peek-column"), false);
+    assert.equal(
+      f.document.querySelectorAll("[data-lso-peek-leading]").length,
+      0,
+    );
   } finally {
     await f.close();
   }
