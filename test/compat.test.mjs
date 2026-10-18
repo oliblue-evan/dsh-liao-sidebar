@@ -199,6 +199,30 @@ test("collapsed pages are detected and fixed, then honor their switches", async 
     );
     await page.waitForSelector("#center[data-lso-page-fix]");
 
+    await page.evaluate(() => {
+      const frame = document.querySelector("#frame");
+      frame.removeAttribute("data-sidebar-collapsed");
+      frame.setAttribute("data-lso-peek", "");
+    });
+    await page.waitForTimeout(80);
+    assert.equal(
+      await page.evaluate(
+        () => document.querySelector("#center").getAttribute("data-lso-page-fix"),
+      ),
+      "true",
+      "the hover preview keeps the safe-area spacing while the sidebar is overlaid",
+    );
+    await page.evaluate(() =>
+      document.querySelector("#frame").removeAttribute("data-lso-peek"),
+    );
+    await page.waitForFunction(
+      () => !document.querySelector("#center").hasAttribute("data-lso-page-fix"),
+    );
+    await page.evaluate(() =>
+      document.querySelector("#frame").setAttribute("data-sidebar-collapsed", ""),
+    );
+    await page.waitForSelector("#center[data-lso-page-fix]");
+
     await page.evaluate((key) => {
       const config = JSON.parse(localStorage.getItem(key));
       config.optimizePages = { skills: false };
