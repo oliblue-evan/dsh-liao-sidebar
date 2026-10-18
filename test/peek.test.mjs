@@ -17,6 +17,10 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
     await f.flush();
     assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
     assert.equal(f.column.hasAttribute("data-lso-peek-column"), true);
+    assert.match(
+      f.frame.style.getPropertyValue("--lso-peek-grid"),
+      /minmax\(0,\s*1fr\)/,
+    );
     assert.equal(f.toggles(), 1);
     assert.equal(f.collapsed(), false);
 

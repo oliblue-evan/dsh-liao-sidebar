@@ -45,7 +45,7 @@ try {
     });
   const manifest = JSON.parse(read("package.json"));
   assert.equal(manifest.name, "dsh-liao-sidebar");
-  assert.equal(manifest.version, "0.2.0");
+  assert.equal(manifest.version, "0.2.1");
   assert.equal(JSON.parse(read("locale/zh.json")).meta.title, "侧栏管家");
   assert.match(
     read("lib/client.js"),
