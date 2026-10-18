@@ -49,7 +49,7 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
   }
 });
 
-test("collapsed hover preview can be disabled and clicking inside pins the sidebar", async () => {
+test("collapsed hover preview can be disabled and clicking inside keeps it floating", async () => {
   const disabled = await fixture({ collapsed: true, config: { peek: false } });
   try {
     disabled.document
@@ -79,8 +79,9 @@ test("collapsed hover preview can be disabled and clicking inside pins the sideb
     inside.dispatchEvent(
       new f.window.MouseEvent("pointerdown", { bubbles: true }),
     );
-    assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
-    assert.equal(f.column.hasAttribute("data-lso-peek-column"), false);
+    inside.dispatchEvent(new f.window.MouseEvent("click", { bubbles: true }));
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
+    assert.equal(f.column.hasAttribute("data-lso-peek-column"), true);
     assert.equal(f.toggles(), 1);
     assert.equal(f.collapsed(), false);
   } finally {
