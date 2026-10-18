@@ -331,3 +331,38 @@ test("pinning the preview clears a floating More menu first", async () => {
     await f.close();
   }
 });
+
+test("selecting entries inside the sidebar preview keeps the More popover open", async () => {
+  const f = await fixture({
+    collapsed: true,
+    config: { more: ["skills", "context"] },
+  });
+  try {
+    f.document
+      .querySelector('[data-shell-leading] button[aria-label="打开侧边栏"]')
+      .dispatchEvent(
+        new f.window.MouseEvent("pointerover", { bubbles: true }),
+      );
+    await sleep(220);
+    await f.flush();
+
+    f.document
+      .querySelector("[data-lso-trigger]")
+      .dispatchEvent(new f.window.MouseEvent("mouseenter"));
+    assert.ok(f.document.querySelector(".lso-popover"));
+
+    await f.click('.lso-popover [data-lso-entry="skills"]');
+    assert.ok(
+      f.document.querySelector(".lso-popover"),
+      "the first selection keeps the popover open",
+    );
+    await f.click('.lso-popover [data-lso-entry="context"]');
+    assert.ok(
+      f.document.querySelector(".lso-popover"),
+      "the popover survives consecutive selections inside the sidebar preview",
+    );
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
+  } finally {
+    await f.close();
+  }
+});
