@@ -27,6 +27,19 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
       f.document.querySelectorAll("[data-lso-peek-leading]").length,
       1,
     );
+    const peekTop = parseInt(
+        f.frame.style.getPropertyValue("--lso-peek-top"),
+        10,
+      ),
+      peekHeight = parseInt(
+        f.frame.style.getPropertyValue("--lso-peek-height"),
+        10,
+      );
+    assert.equal(
+      peekHeight,
+      Math.max(320, Math.round((f.window.innerHeight - peekTop - 12) * 0.8)),
+      "the floating preview uses four fifths of the available height",
+    );
     assert.equal(f.toggles(), 1);
     assert.equal(f.collapsed(), false);
 
