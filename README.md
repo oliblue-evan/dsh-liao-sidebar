@@ -9,7 +9,7 @@
 ## 安装
 
 ```sh
-dsh plugin --profile desktop add github:oliblue-evan/dsh-sidebar-organizer
+dsh plugin --profile desktop add github:oliblue-evan/dsh-liao-sidebar
 ```
 
 也可以把 `https://raw.githubusercontent.com/oliblue-evan/dsh-plugin-index/main/index.json` 添加为 DSH 的自定义插件索引源。

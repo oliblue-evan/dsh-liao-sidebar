@@ -44,12 +44,12 @@ try {
       encoding: "utf8",
     });
   const manifest = JSON.parse(read("package.json"));
-  assert.equal(manifest.name, "dsh-sidebar-organizer");
+  assert.equal(manifest.name, "dsh-liao-sidebar");
   assert.equal(manifest.version, "0.1.1");
   assert.equal(JSON.parse(read("locale/zh.json")).meta.title, "侧栏管家");
   assert.match(
     read("lib/client.js"),
-    /id:\s*["']dsh-sidebar-organizer["']/,
+    /id:\s*["']dsh-liao-sidebar["']/,
     "The client loader ID must match the package ID expected by DSH",
   );
   assert.doesNotMatch(

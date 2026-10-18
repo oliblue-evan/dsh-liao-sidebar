@@ -5,7 +5,7 @@
     "namespace": "liao",
     "name": "sidebar-organizer",
     "coordinate": "liao/sidebar-organizer",
-    "packageName": "dsh-sidebar-organizer"
+    "packageName": "dsh-liao-sidebar"
   },
   "names": {
     "pluginNames": ["liao-sidebar-organizer"],

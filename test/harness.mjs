@@ -107,7 +107,7 @@ export async function fixture({
     sandbox,
   );
   const plugin = modules
-    ? await modules.import("dsh-sidebar-organizer")
+    ? await modules.import("dsh-liao-sidebar")
     : entry.factory((name) => {
         if (name !== "react") throw Error(name);
         return React;
@@ -177,7 +177,7 @@ export async function fixture({
       await act(async () =>
         root.render(
           React.createElement(
-            slots.get("plugins.bundle.config:dsh-sidebar-organizer"),
+            slots.get("plugins.bundle.config:dsh-liao-sidebar"),
           ),
         ),
       );
