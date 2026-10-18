@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +7,9 @@ import { execFileSync } from "node:child_process";
 import { fixture, readAsar } from "./harness.mjs";
 
 const dir = mkdtempSync(join(tmpdir(), "dsh-sidebar-pack-"));
+const packageVersion = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).version;
 let f;
 try {
   const archive = join(dir, "plugin.tgz"),
@@ -45,7 +48,7 @@ try {
     });
   const manifest = JSON.parse(read("package.json"));
   assert.equal(manifest.name, "dsh-liao-sidebar");
-  assert.equal(manifest.version, "0.2.5");
+  assert.equal(manifest.version, packageVersion);
   assert.equal(JSON.parse(read("locale/zh.json")).meta.title, "侧栏管家");
   assert.match(
     read("lib/client.js"),
