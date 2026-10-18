@@ -154,6 +154,12 @@ test("the promoted hidden panel persists until another entry is selected or More
 
     await f.click("[data-lso-trigger]");
     assert.equal(f.document.querySelector(".lso-menu").hidden, false);
+    const pluginCss = f.document.querySelector("[data-lso-style]").textContent;
+    assert.match(
+      pluginCss,
+      /\.lso-more\[aria-expanded=true\]>\[data-lso-label\]\{color:var\(--dsw-alias-label-tertiary,#8e8e93\)!important\}/,
+      "the expanded More label is deliberately muted",
+    );
     assert.ok(
       f.document.querySelector('.lso-menu [data-lso-entry="skills"]'),
       "the expanded menu already shows the selected entry",
