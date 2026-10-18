@@ -1,0 +1,74 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { fixture } from "./harness.mjs";
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("collapsed hover preview uses the real sidebar and restores the collapsed state", async () => {
+  const f = await fixture({ collapsed: true });
+  try {
+    const trigger = f.document.querySelector(
+      '[data-shell-leading] button[aria-label="打开侧边栏"]',
+    );
+    trigger.dispatchEvent(
+      new f.window.MouseEvent("pointerover", { bubbles: true }),
+    );
+    await sleep(220);
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
+    assert.equal(f.column.hasAttribute("data-lso-peek-column"), true);
+    assert.equal(f.toggles(), 1);
+    assert.equal(f.collapsed(), false);
+
+    f.document.body.dispatchEvent(
+      new f.window.MouseEvent("pointermove", { bubbles: true }),
+    );
+    await sleep(220);
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
+    assert.equal(f.column.hasAttribute("data-lso-peek-column"), false);
+    assert.equal(f.toggles(), 2);
+    assert.equal(f.collapsed(), true);
+  } finally {
+    await f.close();
+  }
+});
+
+test("collapsed hover preview can be disabled and clicking inside pins the sidebar", async () => {
+  const disabled = await fixture({ collapsed: true, config: { peek: false } });
+  try {
+    disabled.document
+      .querySelector('[data-shell-leading] button[aria-label="打开侧边栏"]')
+      .dispatchEvent(
+        new disabled.window.MouseEvent("pointerover", { bubbles: true }),
+      );
+    await sleep(220);
+    await disabled.flush();
+    assert.equal(disabled.frame.hasAttribute("data-lso-peek"), false);
+    assert.equal(disabled.toggles(), 0);
+  } finally {
+    await disabled.close();
+  }
+
+  const f = await fixture({ collapsed: true });
+  try {
+    const trigger = f.document.querySelector(
+      '[data-shell-leading] button[aria-label="打开侧边栏"]',
+    );
+    trigger.dispatchEvent(
+      new f.window.MouseEvent("pointerover", { bubbles: true }),
+    );
+    await sleep(220);
+    await f.flush();
+    const inside = f.column.querySelector("button");
+    inside.dispatchEvent(
+      new f.window.MouseEvent("pointerdown", { bubbles: true }),
+    );
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
+    assert.equal(f.column.hasAttribute("data-lso-peek-column"), false);
+    assert.equal(f.toggles(), 1);
+    assert.equal(f.collapsed(), false);
+  } finally {
+    await f.close();
+  }
+});

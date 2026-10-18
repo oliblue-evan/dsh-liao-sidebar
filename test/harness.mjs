@@ -42,11 +42,15 @@ export async function fixture({
   source,
   loaderSource,
   slotEntries = entries,
+  collapsed = false,
 } = {}) {
   const liveEntries = slotEntries.slice();
   const nav = `<nav aria-label="全局面板">${liveEntries.map((entry) => `<button aria-label="${entry.options.label}"><svg><path d="M0 0"></path></svg><span>${entry.options.label}</span></button>`).join("")}</nav>`;
+  const shell = collapsed
+    ? `<div data-test-frame data-sidebar-collapsed><div data-test-column>${nav}</div><div data-shell-leading><button aria-label="打开侧边栏"></button><button aria-label="新建会话"></button></div></div>`
+    : nav;
   const dom = new JSDOM(
-    `<html lang="zh"><head></head><body>${nav}<main id="settings"></main></body></html>`,
+    `<html lang="zh"><head></head><body>${shell}<main id="settings"></main></body></html>`,
     { url: "http://localhost", pretendToBeVisual: true },
   );
   const { window } = dom,
@@ -114,6 +118,22 @@ export async function fixture({
       });
   const slots = new Map(),
     disposers = [];
+  const frame = document.querySelector("[data-test-frame]");
+  const column = document.querySelector("[data-test-column]");
+  let collapsedState = collapsed;
+  let toggleCount = 0;
+  if (frame) {
+    const trigger = frame.querySelector("[data-shell-leading] button");
+    if (trigger)
+      trigger.getBoundingClientRect = () => ({
+        left: 88,
+        top: 11,
+        right: 116,
+        bottom: 39,
+        width: 28,
+        height: 28,
+      });
+  }
   let root;
   const ctx = {
     effect(fn) {
@@ -137,6 +157,16 @@ export async function fixture({
         return () => slots.delete(key);
       },
     },
+    layout: frame
+      ? {
+          toggleSidebar() {
+            toggleCount += 1;
+            collapsedState = !collapsedState;
+            if (collapsedState) frame.setAttribute("data-sidebar-collapsed", "");
+            else frame.removeAttribute("data-sidebar-collapsed");
+          },
+        }
+      : undefined,
   };
   await act(async () => plugin.apply(ctx));
   async function flush() {
@@ -156,7 +186,12 @@ export async function fixture({
     dom,
     window,
     document,
+    frame,
+    column,
     slots,
+    flush,
+    toggles: () => toggleCount,
+    collapsed: () => collapsedState,
     async click(selector) {
       const node = document.querySelector(selector);
       if (!node) throw Error(`Missing ${selector}`);

@@ -228,8 +228,8 @@ test("real Chromium renders the card-based settings layout and reflows on narrow
     await page.waitForSelector(".lso-entry-row");
     assert.equal(
       await page.locator(".lso-settings-section").count(),
-      2,
-      "entries and links are grouped into card sections",
+      3,
+      "peek, entries and links are grouped into card sections",
     );
     const layout = await page.evaluate(() => {
       const settings = document.querySelector(".lso-settings");
