@@ -181,6 +181,27 @@ test("real Chromium keeps More visible and renders one anchored drag line", asyn
       true,
       "More remains visible after pulling an entry out",
     );
+    await page.evaluate(async () => {
+      document
+        .querySelector('nav button[aria-label="上下文洞察"]')
+        .setAttribute("aria-current", "page");
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    });
+    const promoted = await page.evaluate(() => {
+      const row = document.querySelector(
+        'nav > [data-lso-selection="context"]',
+      );
+      return {
+        selected: row && row.getAttribute("data-lso-selected"),
+        background: row && getComputedStyle(row).backgroundColor,
+      };
+    });
+    assert.equal(promoted.selected, "true");
+    assert.notEqual(
+      promoted.background,
+      "rgba(0, 0, 0, 0)",
+      "the promoted current-panel row keeps the host's selected background",
+    );
     await page.evaluate(() => window.__lsoDispose());
   } finally {
     await browser.close();

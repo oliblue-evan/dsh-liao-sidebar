@@ -301,6 +301,11 @@ test("a selected hidden panel is promoted outside the native More anchor wrapper
       );
       assert.ok(proxy, "the active hidden panel is shown in the sidebar");
       assert.equal(
+        proxy.getAttribute("data-lso-selected"),
+        "true",
+        "the promoted row carries its selected styling explicitly",
+      );
+      assert.equal(
         proxy.nextElementSibling,
         more.parentElement,
         "the proxy sits before the native anchor wrapper, not inside it",
@@ -374,6 +379,71 @@ test("More expands in place and restores entry names while the sidebar is open",
       );
     },
   ));
+
+test("official More rows replace duplicate clones and keep their pin action", async () =>
+  using(
+    {
+      officialMore: true,
+      officialMoreEntries: ["context"],
+      config: { more: ["context", "schedule"] },
+    },
+    async (f) => {
+      await f.click('nav button[aria-haspopup="menu"]');
+      const menu = f.document.querySelector('[role="menu"]');
+      assert.ok(menu, "the official More menu opens");
+      assert.equal(
+        menu.querySelectorAll('.lso-native-extra [data-lso-entry="context"]')
+          .length,
+        0,
+        "the official row replaces our duplicate entry row",
+      );
+      assert.equal(
+        menu.querySelectorAll('.lso-native-extra [data-lso-entry="schedule"]')
+          .length,
+        1,
+        "entries not rendered by the official menu still use our organized row",
+      );
+      const pin = menu.querySelector(".sidebarEntry .pinButton");
+      assert.ok(pin, "the official pin action remains available");
+      await f.click(".sidebarEntry .pinButton");
+      const saved = JSON.parse(f.window.localStorage.getItem(configKey));
+      assert.equal(
+        saved.more.includes("context"),
+        false,
+        "using the official pin action unpins the entry in our state too",
+      );
+    },
+  ));
+
+test("official pin labels prefer the longest matching entry name", async () => {
+  const market = {
+    options: { id: "market", order: 10, label: "插件市场" },
+    registrant: "dsh-market",
+  };
+  await using(
+    {
+      officialMore: true,
+      officialMoreEntries: ["market"],
+      slotEntries: [entries[0], market, entries[3]],
+      config: { more: ["market", "schedule"] },
+    },
+    async (f) => {
+      await f.click('nav button[aria-haspopup="menu"]');
+      await f.click(".sidebarEntry .pinButton");
+      const saved = JSON.parse(f.window.localStorage.getItem(configKey));
+      assert.equal(
+        saved.more.includes("market"),
+        false,
+        "the market entry is unpinned",
+      );
+      assert.equal(
+        saved.more.includes("plugins"),
+        false,
+        "the plugin prefix inside the market label is not mistaken for its own entry",
+      );
+    },
+  );
+});
 
 test("hover mode keeps readable labels and selected state in the collapsed rail", async () =>
   using(

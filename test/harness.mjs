@@ -45,6 +45,7 @@ export async function fixture({
   collapsed = false,
   hideMoreLabels = false,
   officialMore = false,
+  officialMoreEntries = [],
 } = {}) {
   const liveEntries = slotEntries.slice();
   const hiddenIds = new Set((config && config.more) || []);
@@ -146,8 +147,15 @@ export async function fixture({
       }
       officialMenu = document.createElement("div");
       officialMenu.setAttribute("role", "menu");
+      const rows = liveEntries
+        .filter((entry) => officialMoreEntries.includes(entry.options.id))
+        .map(
+          (entry) =>
+            `<div class="sidebarEntry"><button role="menuitem"><span>${entry.options.label}</span></button><span class="pinAnchor"><button role="menuitem" class="pinButton" aria-label="将${entry.options.label}固定到侧边栏">固定</button></span></div>`,
+        )
+        .join("");
       officialMenu.innerHTML =
-        '<div role="presentation"><div data-slot="sidebar.panellist.actions"><button role="menuitem">浏览更多插件</button><button role="menuitem">创建你的插件</button></div></div>';
+        `<div role="presentation">${rows}<div data-slot="sidebar.panellist.actions"><button role="menuitem">浏览更多插件</button><button role="menuitem">创建你的插件</button></div></div>`;
       document.body.appendChild(officialMenu);
       officialTrigger.setAttribute("aria-expanded", "true");
     });
