@@ -253,6 +253,16 @@ test("real Chromium renders the card-based settings layout and reflows on narrow
 
     await page.waitForSelector(".lso-entry-row");
     assert.equal(
+      await page.locator('[data-lso-sort-id="link-docs"]').count(),
+      1,
+      "custom links appear in the unified sortable list",
+    );
+    assert.equal(
+      await page.locator(".lso-link-list").count(),
+      0,
+      "the link disclosure no longer keeps a second sortable list",
+    );
+    assert.equal(
       await page.locator(".lso-settings-section").count(),
       5,
       "More mode, peek, display compatibility, entries and links are grouped into card sections",

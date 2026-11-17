@@ -46,19 +46,21 @@ export async function fixture({
   hideMoreLabels = false,
   officialMore = false,
   officialMoreEntries = [],
+  panelNavigation = false,
+  navLabel = "全局面板",
 } = {}) {
   const liveEntries = slotEntries.slice();
   const hiddenIds = new Set((config && config.more) || []);
   const officialButton = officialMore
     ? '<span class="moreAnchor"><button aria-label="更多" aria-haspopup="menu" aria-expanded="false"><svg><path d="M0 0"></path></svg><span>更多</span></button></span>'
     : "";
-  const nav = `<nav aria-label="全局面板">${liveEntries
+  const nav = `<nav aria-label="${navLabel}">${liveEntries
     .map((entry) => {
       const label =
         hideMoreLabels && hiddenIds.has(entry.options.id)
           ? ""
           : `<span>${entry.options.label}</span>`;
-      return `<button aria-label="${entry.options.label}"><svg><path d="M0 0"></path></svg>${label}</button>`;
+      return `<button aria-label="${entry.options.label}"><span data-slot="sidebar.panellist"></span><svg><path d="M0 0"></path></svg>${label}</button>`;
     })
     .join("")}${officialButton}</nav>`;
   const shell = collapsed
@@ -151,7 +153,7 @@ export async function fixture({
         .filter((entry) => officialMoreEntries.includes(entry.options.id))
         .map(
           (entry) =>
-            `<div class="sidebarEntry"><button role="menuitem"><span>${entry.options.label}</span></button><span class="pinAnchor"><button role="menuitem" class="pinButton" aria-label="将${entry.options.label}固定到侧边栏">固定</button></span></div>`,
+          `<div class="sidebarEntry"><button role="menuitem"><span>${entry.options.label}</span></button><span class="pinAnchor"><button role="menuitem" class="pinButton" aria-label="将${entry.options.label}固定到侧边栏"><svg data-icon="dsw-icon-pin-outline-regular"></svg>固定</button></span></div>`,
         )
         .join("");
       officialMenu.innerHTML =
@@ -164,6 +166,9 @@ export async function fixture({
   const column = document.querySelector("[data-test-column]");
   let collapsedState = collapsed;
   let toggleCount = 0;
+  let activePanelId = null;
+  const panelCalls = [],
+    panelListeners = new Set();
   if (frame) {
     const trigger = frame.querySelector("[data-shell-leading] button");
     const leading = frame.querySelector("[data-shell-leading]");
@@ -187,6 +192,28 @@ export async function fixture({
       });
   }
   let root;
+  const layout = {};
+  if (frame)
+    layout.toggleSidebar = () => {
+      toggleCount += 1;
+      collapsedState = !collapsedState;
+      if (collapsedState) frame.setAttribute("data-sidebar-collapsed", "");
+      else frame.removeAttribute("data-sidebar-collapsed");
+    };
+  if (panelNavigation) {
+    layout.selectPanel = (id) => {
+      activePanelId = id;
+      panelCalls.push(id);
+      panelListeners.forEach((listener) => listener());
+    };
+    layout.panelInfo = {
+      getSnapshot: () => ({ activePanelId }),
+      subscribe: (listener) => {
+        panelListeners.add(listener);
+        return () => panelListeners.delete(listener);
+      },
+    };
+  }
   const ctx = {
     effect(fn) {
       const dispose = fn();
@@ -209,16 +236,7 @@ export async function fixture({
         return () => slots.delete(key);
       },
     },
-    layout: frame
-      ? {
-          toggleSidebar() {
-            toggleCount += 1;
-            collapsedState = !collapsedState;
-            if (collapsedState) frame.setAttribute("data-sidebar-collapsed", "");
-            else frame.removeAttribute("data-sidebar-collapsed");
-          },
-        }
-      : undefined,
+    layout: frame || panelNavigation ? layout : undefined,
   };
   await act(async () => plugin.apply(ctx));
   async function flush() {
@@ -244,6 +262,12 @@ export async function fixture({
     flush,
     toggles: () => toggleCount,
     collapsed: () => collapsedState,
+    panelCalls: () => panelCalls.slice(),
+    async setActivePanel(id) {
+      activePanelId = id;
+      panelListeners.forEach((listener) => listener());
+      await flush();
+    },
     async click(selector) {
       const node = document.querySelector(selector);
       if (!node) throw Error(`Missing ${selector}`);

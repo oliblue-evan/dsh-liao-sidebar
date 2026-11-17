@@ -80,6 +80,24 @@ test("the official More button becomes the shared host for organized entries and
         ["skills", "context", "link-docs"],
         "native and custom rows keep the configured More order",
       );
+      const savedOrder = JSON.parse(
+        f.window.localStorage.getItem(configKey),
+      ).order;
+      Array.from(extra.querySelectorAll("[data-lso-entry]")).forEach(
+        (node) => {
+          const id = node.getAttribute("data-lso-entry");
+          assert.equal(
+            Number(node.style.order),
+            savedOrder.indexOf(id) - 100,
+            "plugin rows use the same order scale as official rows",
+          );
+        },
+      );
+      assert.match(
+        f.document.querySelector("[data-lso-style]").textContent,
+        /\.lso-native-extra\{display:contents\}/,
+        "the wrapper does not stop rows interleaving with official entries",
+      );
       assert.equal(
         slot.querySelectorAll("button").length,
         2,
@@ -403,6 +421,19 @@ test("official More rows replace duplicate clones and keep their pin action", as
         1,
         "entries not rendered by the official menu still use our organized row",
       );
+      const officialRow = menu.querySelector(
+        '.sidebarEntry button[role="menuitem"]',
+      );
+      assert.equal(
+        officialRow.getAttribute("data-lso-entry"),
+        "context",
+        "the official row joins our drag ordering",
+      );
+      assert.equal(
+        officialRow.getAttribute("draggable"),
+        "false",
+        "the pointer drag owns the official row",
+      );
       const pin = menu.querySelector(".sidebarEntry .pinButton");
       assert.ok(pin, "the official pin action remains available");
       await f.click(".sidebarEntry .pinButton");
@@ -411,6 +442,124 @@ test("official More rows replace duplicate clones and keep their pin action", as
         saved.more.includes("context"),
         false,
         "using the official pin action unpins the entry in our state too",
+      );
+    },
+  ));
+
+test("an entry unpinned by the host keeps a clickable sidebar proxy", async () =>
+  using(
+    {
+      officialMore: true,
+      officialMoreEntries: ["context"],
+      panelNavigation: true,
+      config: { more: ["context"] },
+    },
+    async (f) => {
+      const native = f.document.querySelector(
+        'nav button[aria-label="上下文洞察"]',
+      );
+      assert.ok(native, "the host renders the entry before it is unpinned");
+      native.remove();
+      await f.flush();
+      await f.setActivePanel("context");
+      const proxy = f.document.querySelector(
+        'nav > [data-lso-selection="context"]',
+      );
+      assert.ok(proxy, "the selected entry still has a sidebar row");
+      assert.match(proxy.textContent, /上下文洞察/);
+      assert.match(
+        proxy.style.order,
+        /^-?\d+$/,
+        "the proxy order is an integer CSS accepts",
+      );
+      await f.click('[data-lso-selection="context"]');
+      assert.deepEqual(
+        f.panelCalls(),
+        ["context"],
+        "the proxy navigates through the host panel service",
+      );
+    },
+  ));
+
+test("clicking a More row's label opens the entry", async () =>
+  using(
+    {
+      panelNavigation: true,
+      config: { more: ["context"] },
+    },
+    async (f) => {
+      await f.click("[data-lso-trigger]");
+      const label = f.document.querySelector(
+        '.lso-menu [data-lso-entry="context"] .lso-item-label',
+      );
+      assert.ok(label, "the clone row renders its own label");
+      await act(async () =>
+        label.dispatchEvent(
+          new f.window.MouseEvent("click", { bubbles: true }),
+        ),
+      );
+      await f.flush();
+      assert.deepEqual(
+        f.panelCalls(),
+        ["context"],
+        "a click on the row content is not mistaken for a nested control",
+      );
+    },
+  ));
+
+test("the organizer finds a localized panel navigation and pin action", async () =>
+  using(
+    {
+      navLabel: "グローバルパネル",
+      officialMore: true,
+      officialMoreEntries: ["context"],
+      config: { more: ["context"] },
+    },
+    async (f) => {
+      assert.ok(
+        f.document.querySelector(
+          "[data-lso-trigger],[data-lso-official-trigger]",
+        ),
+        "the panel navigation is found without an English or Chinese label",
+      );
+      await f.click('nav button[aria-haspopup="menu"]');
+      const pin = f.document.querySelector(".sidebarEntry .pinButton");
+      pin.setAttribute(
+        "aria-label",
+        "Fijar 上下文洞察 en la barra lateral",
+      );
+      await f.click(".sidebarEntry .pinButton");
+      const saved = JSON.parse(f.window.localStorage.getItem(configKey));
+      assert.equal(
+        saved.more.includes("context"),
+        false,
+        "the pin action is recognized from its icon instead of its copy",
+      );
+    },
+  ));
+
+test("settings pin an official More entry instead of only dropping local state", async () =>
+  using(
+    {
+      officialMore: true,
+      officialMoreEntries: ["context"],
+      config: { more: ["context"] },
+    },
+    async (f) => {
+      await f.settings();
+      const row = Array.from(
+        f.document.querySelectorAll(".lso-entry-row"),
+      ).find((node) => node.textContent.includes("上下文洞察"));
+      assert.ok(row, "the entry row is rendered");
+      const toggle = row.querySelector(".lso-more-switch");
+      await act(async () => toggle.click());
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      await f.flush();
+      const saved = JSON.parse(f.window.localStorage.getItem(configKey));
+      assert.equal(
+        saved.more.includes("context"),
+        false,
+        "the official pin action moves the entry back to the sidebar",
       );
     },
   ));
@@ -444,6 +593,118 @@ test("official pin labels prefer the longest matching entry name", async () => {
     },
   );
 });
+
+test("a pinwheel icon on a panel row is not mistaken for a pin action", async () => {
+  const market = {
+    options: { id: "market", order: 10, label: "插件市场" },
+    registrant: "dsh-market",
+  };
+  await using(
+    {
+      slotEntries: [entries[0], market, entries[3]],
+      panelNavigation: true,
+      config: { more: ["market"] },
+    },
+    async (f) => {
+      f.document
+        .querySelector('nav button[aria-label="插件市场"] svg')
+        .setAttribute("data-icon", "dsw-icon-plugin-pinwheel-outline-regular");
+      await f.setActivePanel("market");
+      const proxy = f.document.querySelector('[data-lso-selection="market"]');
+      assert.ok(proxy, "the selected hidden entry has a sidebar proxy");
+      await f.click('[data-lso-selection="market"]');
+      const saved = JSON.parse(f.window.localStorage.getItem(configKey));
+      assert.equal(
+        saved.more.includes("market"),
+        true,
+        "opening the panel does not remove it from More",
+      );
+      assert.deepEqual(
+        f.panelCalls(),
+        ["market"],
+        "the row still navigates to its panel",
+      );
+    },
+  );
+});
+
+test("moving an entry to More delegates to the official unpin action", async () =>
+  using(
+    {
+      panelNavigation: true,
+    },
+    async (f) => {
+      const target = f.document.querySelector(
+        'nav button[aria-label="上下文洞察"]',
+      );
+      const unpin = f.document.createElement("button");
+      unpin.setAttribute(
+        "aria-label",
+        "从侧边栏取消固定上下文洞察",
+      );
+      unpin.innerHTML =
+        '<svg data-icon="dsw-icon-pin-fill-regular"></svg>';
+      let clicked = 0;
+      unpin.addEventListener("click", () => {
+        clicked += 1;
+        target.remove();
+      });
+      target.parentElement.appendChild(unpin);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      await f.flush();
+      await f.settings();
+      const row = Array.from(
+        f.document.querySelectorAll(".lso-entry-row"),
+      ).find((node) => node.textContent.includes("上下文洞察"));
+      assert.ok(row, "the entry row is rendered");
+      await act(async () => row.querySelector(".lso-more-switch").click());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      await f.flush();
+      const saved = JSON.parse(f.window.localStorage.getItem(configKey));
+      assert.equal(clicked, 1, "the host unpin action is used");
+      assert.equal(
+        saved.more.includes("context"),
+        true,
+        "the host action is mirrored into the organizer state",
+      );
+    },
+  ));
+
+test("saved More entries align with an already-pinned host once", async () =>
+  using(
+    {
+      panelNavigation: true,
+      config: { more: ["context"] },
+    },
+    async (f) => {
+      const target = f.document.querySelector(
+        'nav button[aria-label="上下文洞察"]',
+      );
+      const unpin = f.document.createElement("button");
+      unpin.setAttribute(
+        "aria-label",
+        "从侧边栏取消固定上下文洞察",
+      );
+      unpin.innerHTML =
+        '<svg data-icon="dsw-icon-pin-fill-regular"></svg>';
+      let clicked = 0;
+      unpin.addEventListener("click", () => {
+        clicked += 1;
+        target.remove();
+      });
+      target.parentElement.appendChild(unpin);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      await f.flush();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      await f.flush();
+      assert.equal(clicked, 1, "the saved entry is unpinned once");
+      assert.equal(
+        f.document.contains(target),
+        false,
+        "the host completes the unpin instead of leaving a hidden pinned row",
+      );
+    },
+  ));
 
 test("hover mode keeps readable labels and selected state in the collapsed rail", async () =>
   using(
@@ -1205,6 +1466,99 @@ test("settings reject duplicate shortcuts, report the conflict, and accept arrow
     stored = JSON.parse(f.window.localStorage.getItem(configKey));
     assert.equal(stored.shortcuts.context, "Ctrl+DOWN");
   }));
+
+test("settings reject shortcuts owned by the host and yield saved conflicts", async () =>
+  using(
+    {
+      config: { shortcuts: { skills: "Meta+B" } },
+    },
+    async (f) => {
+      const host = f.document.createElement("button");
+      host.setAttribute("aria-label", "打开侧边栏");
+      host.setAttribute("aria-keyshortcuts", "Meta+B");
+      f.document.body.appendChild(host);
+      await f.flush();
+      await f.settings();
+      assert.match(
+        f.document.querySelector(".lso-shortcut-warning").textContent,
+        /打开侧边栏/,
+      );
+      const conflictField = f.document.querySelector(
+        '[aria-label="快捷键 上下文洞察"]',
+      );
+      const conflictProps =
+        conflictField[
+          Object.keys(conflictField).find((key) =>
+            key.startsWith("__reactProps"),
+          )
+        ];
+      await act(async () =>
+        conflictProps.onKeyDown({
+          key: "b",
+          metaKey: true,
+          currentTarget: { blur() {} },
+          preventDefault() {},
+        }),
+      );
+      const stored = JSON.parse(f.window.localStorage.getItem(configKey));
+      assert.equal(stored.shortcuts.context, undefined);
+      assert.match(f.document.querySelector(".lso-error").textContent, /打开侧边栏/);
+
+      let clicked = 0;
+      f.document
+        .querySelector('nav button[aria-label="技能中心"]')
+        .addEventListener("click", () => clicked++);
+      const event = new f.window.KeyboardEvent("keydown", {
+        key: "b",
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      await act(async () => f.document.body.dispatchEvent(event));
+      assert.equal(clicked, 0, "the plugin yields the host shortcut");
+      assert.equal(
+        event.defaultPrevented,
+        false,
+        "the host keeps ownership of its shortcut",
+      );
+    },
+  ));
+
+test("settings show entries and links in one list that reorders and removes links", async () =>
+  using(
+    {
+      config: {
+        order: ["skills", "link-a"],
+        links: [
+          {
+            id: "link-a",
+            label: "文档",
+            url: "https://example.com/a",
+          },
+        ],
+      },
+    },
+    async (f) => {
+      await f.settings();
+      const list = f.document.querySelector(".lso-settings-list");
+      assert.deepEqual(
+        [...list.children].slice(0, 2).map((row) => row.dataset.lsoSortId),
+        ["skills", "link-a"],
+      );
+      assert.equal(f.document.querySelector(".lso-link-list"), null);
+      await f.click(
+        '[data-lso-sort-id="link-a"] .lso-actions button[aria-label^="上移"]',
+      );
+      let saved = JSON.parse(f.window.localStorage.getItem(configKey));
+      assert.deepEqual(saved.order.slice(0, 2), ["link-a", "skills"]);
+      await f.click(
+        '[data-lso-sort-id="link-a"] .lso-actions button[aria-label^="移除"]',
+      );
+      saved = JSON.parse(f.window.localStorage.getItem(configKey));
+      assert.equal(saved.links.length, 0);
+      assert.equal(saved.order.includes("link-a"), false);
+    },
+  ));
 
 test("custom links participate in More ordering and can be reordered by dragging", async () =>
   using(

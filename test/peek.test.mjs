@@ -642,3 +642,42 @@ test("selecting entries inside the sidebar preview closes the hover menu", async
     await f.close();
   }
 });
+
+test("choosing an entry from the official More menu keeps the preview open", async () => {
+  const f = await fixture({
+    collapsed: true,
+    officialMore: true,
+    officialMoreEntries: ["context"],
+    config: { more: ["context"], moreMode: "click" },
+  });
+  try {
+    f.document
+      .querySelector('[data-shell-leading] button[aria-label="打开侧边栏"]')
+      .dispatchEvent(
+        new f.window.MouseEvent("pointerover", { bubbles: true }),
+      );
+    await sleep(240);
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
+
+    await f.click("[data-lso-official-trigger]");
+    const row = f.document.querySelector(
+      '[role="menu"] .sidebarEntry button[role="menuitem"]:not([aria-label])',
+    );
+    assert.ok(row, "the official More row is available");
+    let clicked = 0;
+    row.addEventListener("click", () => clicked++);
+    row.dispatchEvent(
+      new f.window.MouseEvent("click", { bubbles: true }),
+    );
+    await f.flush();
+    assert.equal(clicked, 1, "the official row still receives its click");
+    assert.equal(
+      f.frame.hasAttribute("data-lso-peek"),
+      true,
+      "the floating sidebar remains open for the next entry",
+    );
+  } finally {
+    await f.close();
+  }
+});
