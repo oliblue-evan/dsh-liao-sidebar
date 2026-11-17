@@ -114,12 +114,12 @@ test("real Chromium keeps More visible and renders one anchored drag line", asyn
     await page.waitForSelector("[data-lso-trigger]", { state: "visible" });
 
     const trigger = page.locator("[data-lso-trigger]");
-    await trigger.hover();
-    const row = page.locator('.lso-popover [data-lso-entry="skills"]');
+    await trigger.click();
+    const row = page.locator('.lso-menu [data-lso-entry="skills"]');
     await row.waitFor({ state: "visible" });
-    if (process.env.LSO_POPOVER_SCREENSHOT)
+    if (process.env.LSO_MORE_SCREENSHOT)
       await page.screenshot({
-        path: process.env.LSO_POPOVER_SCREENSHOT,
+        path: process.env.LSO_MORE_SCREENSHOT,
         fullPage: true,
       });
     const plugin = page.locator('nav button[aria-label="插件"]');
@@ -137,7 +137,7 @@ test("real Chromium keeps More visible and renders one anchored drag line", asyn
     });
     const whileInside = await page.evaluate(() => {
       const row = document.querySelector(
-        '.lso-popover [data-lso-entry="skills"]',
+        '.lso-menu [data-lso-entry="skills"]',
       );
       return {
         exists: !!row,
@@ -233,8 +233,8 @@ test("real Chromium renders the card-based settings layout and reflows on narrow
     await page.waitForSelector(".lso-entry-row");
     assert.equal(
       await page.locator(".lso-settings-section").count(),
-      4,
-      "peek, display compatibility, entries and links are grouped into card sections",
+      5,
+      "More mode, peek, display compatibility, entries and links are grouped into card sections",
     );
     const layout = await page.evaluate(() => {
       const settings = document.querySelector(".lso-settings");

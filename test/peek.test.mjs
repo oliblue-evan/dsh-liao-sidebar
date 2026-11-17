@@ -34,6 +34,18 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
       f.document.querySelectorAll("[data-lso-peek-leading]").length,
       1,
     );
+    assert.equal(
+      f.document
+        .querySelector("[data-lso-peek-leading]")
+        .hasAttribute("data-window-drag-exclude"),
+      true,
+      "the fixed titlebar clone stays clickable on macOS Desktop",
+    );
+    assert.equal(
+      f.column.hasAttribute("data-window-drag-exclude"),
+      true,
+      "the floating sidebar declares its own window-drag exclusion",
+    );
     assert.deepEqual(
       Array.from(
         f.document.querySelectorAll("[data-lso-peek-leading] button"),
@@ -65,6 +77,7 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
     await f.flush();
     assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
     assert.equal(f.column.hasAttribute("data-lso-peek-column"), false);
+    assert.equal(f.column.hasAttribute("data-window-drag-exclude"), false);
     assert.equal(strip.hasAttribute("data-lso-peek-hidden"), false);
     assert.equal(
       f.document.querySelectorAll("[data-lso-peek-leading]").length,
@@ -72,6 +85,62 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
     );
     assert.equal(f.toggles(), 2);
     assert.equal(f.collapsed(), true);
+  } finally {
+    await f.close();
+  }
+});
+
+test("collapsed rail layout keeps the open toggle available in the preview", async () => {
+  const f = await fixture({ collapsed: true });
+  try {
+    f.document.querySelector("[data-shell-leading]").remove();
+    const open = f.document.createElement("button");
+    open.setAttribute("aria-label", "打开侧边栏");
+    open.getBoundingClientRect = () => ({
+      left: 10,
+      top: 18,
+      right: 46,
+      bottom: 54,
+      width: 36,
+      height: 36,
+    });
+    const rail = f.document.createElement("div");
+    rail.setAttribute("data-window-drag", "");
+    rail.appendChild(open);
+    const fresh = f.document.createElement("button");
+    fresh.setAttribute("aria-label", "新建会话");
+    fresh.getBoundingClientRect = () => ({
+      left: 10,
+      top: 66,
+      right: 46,
+      bottom: 102,
+      width: 36,
+      height: 36,
+    });
+    const newRow = f.document.createElement("div");
+    newRow.appendChild(fresh);
+    f.column.insertBefore(newRow, f.column.firstChild);
+    f.column.insertBefore(rail, newRow);
+    await f.flush();
+
+    open.dispatchEvent(
+      new f.window.MouseEvent("pointerover", { bubbles: true }),
+    );
+    await sleep(250);
+    await f.flush();
+
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
+    assert.equal(f.column.hasAttribute("data-window-drag-exclude"), true);
+    const clone = f.document.querySelector("[data-lso-peek-leading]");
+    assert.ok(clone, "the rail open toggle is cloned above the preview");
+    assert.equal(clone.hasAttribute("data-window-drag-exclude"), true);
+    assert.deepEqual(
+      Array.from(clone.querySelectorAll("button"), (button) =>
+        button.getAttribute("aria-label"),
+      ),
+      ["打开侧边栏"],
+      "the clone keeps the pin control without inventing a second one",
+    );
   } finally {
     await f.close();
   }
@@ -233,6 +302,45 @@ test("preview fades and slides both in and out", async () => {
   }
 });
 
+test("closing the preview keeps the rail gutter and covers the collapse", async () => {
+  const f = await fixture({ collapsed: true });
+  try {
+    const trigger = f.document.querySelector(
+      '[data-shell-leading] button[aria-label="打开侧边栏"]',
+    );
+    trigger.dispatchEvent(
+      new f.window.MouseEvent("pointerover", { bubbles: true }),
+    );
+    await sleep(220);
+    await f.flush();
+    const grid = f.frame.style.getPropertyValue("--lso-peek-grid");
+    assert.match(
+      grid,
+      /^56px minmax\(0,\s*1fr\) 0px$/,
+      "the preview keeps the collapsed rail width instead of collapsing it",
+    );
+
+    f.document.body.dispatchEvent(
+      new f.window.MouseEvent("pointermove", { bubbles: true }),
+    );
+    await sleep(220);
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
+    assert.equal(f.collapsed(), true, "the host is collapsed again");
+    assert.ok(
+      f.document.querySelector("[data-lso-peek-clone]"),
+      "a static rail covers the host collapse so the sidebar never blanks",
+    );
+    await f.flush();
+    assert.equal(
+      f.document.querySelectorAll("[data-lso-peek-clone]").length,
+      0,
+      "the cover is dropped once the real rail is ready",
+    );
+  } finally {
+    await f.close();
+  }
+});
+
 test("collapsing the host while previewing removes the floating overlay", async () => {
   const f = await fixture({ collapsed: true });
   try {
@@ -355,10 +463,101 @@ test("clicking the preview titlebar open button pins the normal expanded sidebar
   }
 });
 
-test("pinning the preview clears a floating More menu first", async () => {
+test("Meta+B closes the preview and restores the collapsed sidebar", async () => {
+  const f = await fixture({ collapsed: true });
+  try {
+    f.document
+      .querySelector('[data-shell-leading] button[aria-label="打开侧边栏"]')
+      .dispatchEvent(
+        new f.window.MouseEvent("pointerover", { bubbles: true }),
+      );
+    await sleep(220);
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
+    assert.equal(f.collapsed(), false);
+
+    f.document.dispatchEvent(
+      new f.window.KeyboardEvent("keydown", {
+        key: "b",
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await sleep(240);
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
+    assert.equal(
+      f.collapsed(),
+      true,
+      "the host shortcut keeps the sidebar collapsed instead of leaving it open",
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("Escape closes the preview without the hover trigger reopening it", async () => {
+  const f = await fixture({ collapsed: true });
+  try {
+    const trigger = f.document.querySelector(
+      '[data-shell-leading] button[aria-label="打开侧边栏"]',
+    );
+    trigger.dispatchEvent(
+      new f.window.MouseEvent("pointerover", { bubbles: true }),
+    );
+    await sleep(220);
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
+
+    f.document.dispatchEvent(
+      new f.window.KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await sleep(260);
+    await f.flush();
+    assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
+    assert.equal(f.collapsed(), true);
+
+    trigger.dispatchEvent(
+      new f.window.MouseEvent("pointerover", { bubbles: true }),
+    );
+    await sleep(260);
+    assert.equal(
+      f.frame.hasAttribute("data-lso-peek"),
+      false,
+      "the trigger stays quiet until the pointer leaves it",
+    );
+
+    f.document.dispatchEvent(
+      new f.window.MouseEvent("pointermove", {
+        bubbles: true,
+        clientX: 400,
+        clientY: 400,
+      }),
+    );
+    trigger.dispatchEvent(
+      new f.window.MouseEvent("pointerover", { bubbles: true }),
+    );
+    await sleep(260);
+    await f.flush();
+    assert.equal(
+      f.frame.hasAttribute("data-lso-peek"),
+      true,
+      "hover opens the preview again after the pointer moves away",
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("the preview sidebar expands More on hover and collapses it when pinned", async () => {
   const f = await fixture({
     collapsed: true,
-    config: { more: ["skills"] },
+    config: { more: ["skills"], moreMode: "hover" },
   });
   try {
     f.document
@@ -372,21 +571,27 @@ test("pinning the preview clears a floating More menu first", async () => {
     const trigger = f.document.querySelector("[data-lso-trigger]");
     assert.ok(trigger);
     trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
-    assert.ok(
-      f.document.querySelector(".lso-popover"),
-      "the preview sidebar still supports the More hover menu",
+    await sleep(220);
+    await f.flush();
+    const menu = f.document.querySelector(".lso-menu");
+    assert.equal(
+      menu.hidden,
+      false,
+      "the preview sidebar still expands More on hover",
     );
 
+    trigger.dispatchEvent(new f.window.MouseEvent("mouseleave"));
     f.document
       .querySelector(
         '[data-lso-peek-leading] button[aria-label="打开侧边栏"]',
       )
       .click();
     await f.flush();
+    await sleep(220);
     assert.equal(
-      f.document.querySelector(".lso-popover"),
-      null,
-      "pinning the normal sidebar removes the floating menu",
+      menu.hidden,
+      true,
+      "pinning the normal sidebar lets the hover menu collapse",
     );
     assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
   } finally {
@@ -394,10 +599,10 @@ test("pinning the preview clears a floating More menu first", async () => {
   }
 });
 
-test("selecting entries inside the sidebar preview keeps the More popover open", async () => {
+test("selecting entries inside the sidebar preview closes the hover menu", async () => {
   const f = await fixture({
     collapsed: true,
-    config: { more: ["skills", "context"] },
+    config: { more: ["skills", "context"], moreMode: "hover" },
   });
   try {
     f.document
@@ -408,21 +613,30 @@ test("selecting entries inside the sidebar preview keeps the More popover open",
     await sleep(220);
     await f.flush();
 
+    const trigger = f.document.querySelector("[data-lso-trigger]");
+    let clicked = 0;
     f.document
-      .querySelector("[data-lso-trigger]")
-      .dispatchEvent(new f.window.MouseEvent("mouseenter"));
-    assert.ok(f.document.querySelector(".lso-popover"));
+      .querySelector('nav button[aria-label="技能中心"]')
+      .addEventListener("click", () => clicked++);
+    trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+    await sleep(220);
+    await f.flush();
+    const menu = f.document.querySelector(".lso-menu");
+    assert.equal(menu.hidden, false);
 
-    await f.click('.lso-popover [data-lso-entry="skills"]');
-    assert.ok(
-      f.document.querySelector(".lso-popover"),
-      "the first selection keeps the popover open",
+    await f.click('.lso-menu [data-lso-entry="skills"]');
+    assert.equal(clicked, 1, "the row opens the native panel");
+    assert.equal(menu.hidden, true, "choosing a row closes the menu");
+    assert.equal(
+      f.frame.hasAttribute("data-lso-peek"),
+      true,
+      "the sidebar preview stays open",
     );
-    await f.click('.lso-popover [data-lso-entry="context"]');
-    assert.ok(
-      f.document.querySelector(".lso-popover"),
-      "the popover survives consecutive selections inside the sidebar preview",
-    );
+
+    trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+    await sleep(220);
+    await f.flush();
+    assert.equal(menu.hidden, false, "the menu reopens on the next hover");
     assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
   } finally {
     await f.close();

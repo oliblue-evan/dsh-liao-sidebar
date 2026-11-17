@@ -7,9 +7,10 @@ import { execFileSync } from "node:child_process";
 import { fixture, readAsar } from "./harness.mjs";
 
 const dir = mkdtempSync(join(tmpdir(), "dsh-sidebar-pack-"));
-const packageVersion = JSON.parse(
+const packageManifest = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-).version;
+);
+const packageVersion = packageManifest.version;
 let f;
 try {
   const archive = join(dir, "plugin.tgz"),
@@ -29,6 +30,10 @@ try {
     "README.md",
     "cordis.patch.yml",
     "dsh-plugin.naming.json",
+    "docs/detail.en.md",
+    "docs/detail.zh.md",
+    "docs/preview.en.svg",
+    "docs/preview.zh.svg",
     "lib/client.js",
     "lib/index.js",
     "locale/en.json",
@@ -50,6 +55,35 @@ try {
   assert.equal(manifest.name, "dsh-liao-sidebar");
   assert.equal(manifest.version, packageVersion);
   assert.equal(JSON.parse(read("locale/zh.json")).meta.title, "侧栏管家");
+  for (const language of ["zh", "en"]) {
+    const detail = JSON.parse(read(`locale/${language}.json`)).meta.detail;
+    assert.match(
+      detail,
+      /^docs\/detail\.[a-z]{2}\.md$/,
+      "Each locale points at its own short detail document",
+    );
+    assert.ok(
+      entries.includes(`package/${detail}`),
+      `${detail} must ship for the plugin page to show its detail document`,
+    );
+    const image = read(detail).match(/!\[[^\]]*\]\((preview\.[a-z]{2}\.svg)\)/);
+    assert.ok(image, `${detail} must show its preview image`);
+    assert.equal(image[1], `preview.${language}.svg`);
+    assert.ok(
+      entries.includes(`package/docs/${image[1]}`),
+      `${image[1]} must ship beside the detail document`,
+    );
+    const svg = read(`docs/${image[1]}`);
+    assert.match(
+      svg,
+      /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="640" height="300"/,
+      `${image[1]} keeps the 640x300 size the plugin page renders it at`,
+    );
+    assert.ok(
+      svg.length > 10000,
+      `${image[1]} must carry its artwork`,
+    );
+  }
   assert.match(
     read("lib/client.js"),
     /id:\s*["']dsh-liao-sidebar["']/,
@@ -79,16 +113,22 @@ try {
         "dsh/node_modules/@deepseek-ai/dsh-client-modules/lib/client.js",
       )
     : undefined;
-  if (loaderSource)
+  let loaderVersion;
+  if (loaderSource) {
+    loaderVersion = JSON.parse(
+      readAsar(
+        asar,
+        "dsh/node_modules/@deepseek-ai/dsh-client-modules/package.json",
+      ),
+    ).version;
+    const compatibility =
+      packageManifest.dsh?.compatibility?.dshReleases ?? {};
     assert.equal(
-      JSON.parse(
-        readAsar(
-          asar,
-          "dsh/node_modules/@deepseek-ai/dsh-client-modules/package.json",
-        ),
-      ).version,
-      "0.2.1-rc.2",
+      compatibility[loaderVersion],
+      "compatible",
+      `DSH ${loaderVersion} must be listed in dsh.compatibility.dshReleases before packing`,
     );
+  }
   f = await fixture({ source: read("lib/client.js"), loaderSource });
   assert.equal(
     f.document.querySelector("[data-lso-trigger]"),
@@ -140,9 +180,9 @@ try {
     0,
   );
   console.log(
-    "Pack OK: 10 reviewed files; localized metadata, drag-to-create More, menu and disposal passed" +
+    `Pack OK: ${entries.length} reviewed files; localized metadata, drag-to-create More, menu and disposal passed` +
       (loaderSource
-        ? " via DSH 0.2.1-rc.2 ClientModuleSystem."
+        ? ` via DSH ${loaderVersion} ClientModuleSystem.`
         : ". Host loader unavailable; transport proof skipped."),
   );
 } finally {

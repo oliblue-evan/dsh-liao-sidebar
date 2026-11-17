@@ -12,7 +12,313 @@ async function using(options, fn) {
   }
 }
 
-test("More expands in place, restores entry names, and previews on hover while the sidebar is open", async () =>
+test("the official More button becomes the shared host for organized entries and links", async () =>
+  using(
+    {
+      officialMore: true,
+      hideMoreLabels: true,
+      config: {
+        more: ["skills", "context"],
+        links: [{ id: "link-docs", label: "文档", url: "https://example.com" }],
+      },
+    },
+    async (f) => {
+      const more = f.document.querySelector(
+        'nav button[aria-haspopup="menu"]',
+      );
+      assert.ok(more, "the host More button remains available");
+      assert.equal(
+        f.document.querySelector("[data-lso-trigger]"),
+        null,
+        "the plugin does not add a second More button",
+      );
+      assert.equal(more.getAttribute("aria-label"), "更多");
+      assert.equal(
+        more.hasAttribute("data-lso-official-trigger"),
+        true,
+        "the adapter marks, but does not replace, the native button",
+      );
+      assert.equal(
+        f.document.querySelector('nav button[aria-label="技能中心"]').style
+          .display,
+        "none",
+      );
+
+      more.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      await new Promise((resolve) => setTimeout(resolve, 220));
+      assert.equal(
+        f.document.querySelector('[role="menu"]'),
+        null,
+        "click mode leaves the native menu closed when More is only hovered",
+      );
+
+      let clicked = 0;
+      f.document
+        .querySelector('nav button[aria-label="技能中心"]')
+        .addEventListener("click", () => clicked++);
+      await f.click("[data-lso-official-trigger]");
+      const extra = f.document.querySelector("[data-lso-native-extra]");
+      const slot = f.document.querySelector(
+        '[data-slot="sidebar.panellist.actions"]',
+      );
+      assert.ok(extra, "organized rows are injected into the native menu");
+      assert.equal(
+        extra.nextElementSibling,
+        slot,
+        "plugin rows sit before the host's install/create actions",
+      );
+      assert.equal(
+        extra.querySelectorAll("[data-lso-entry]").length,
+        3,
+        "two folded entries and one custom link share the native menu",
+      );
+      assert.deepEqual(
+        Array.from(
+          extra.querySelectorAll("[data-lso-entry]"),
+          (node) => node.getAttribute("data-lso-entry"),
+        ),
+        ["skills", "context", "link-docs"],
+        "native and custom rows keep the configured More order",
+      );
+      assert.equal(
+        slot.querySelectorAll("button").length,
+        2,
+        "the host's own menu actions remain untouched",
+      );
+      assert.equal(
+        extra.querySelector('[data-lso-entry="skills"]').getAttribute("role"),
+        "menuitem",
+      );
+      assert.equal(more.getAttribute("aria-expanded"), "true");
+      assert.equal(more.hasAttribute("aria-controls"), false);
+      assert.equal(more.getAttribute("aria-label"), "更多");
+      assert.equal(
+        f.document
+          .querySelector('[role="menu"]')
+          .hasAttribute("data-window-drag-exclude"),
+        true,
+      );
+
+      await f.click('.lso-native-extra [data-lso-entry="skills"]');
+      assert.equal(clicked, 1, "the row opens the native panel");
+      assert.equal(
+        f.document.querySelector('[role="menu"]'),
+        null,
+        "choosing a row dismisses the native menu",
+      );
+      assert.equal(
+        f.document.querySelector("[data-lso-native-extra]"),
+        null,
+      );
+    },
+  ));
+
+test("hover mode opens the official More menu on pointer intent and keeps it open while browsing", async () =>
+  using(
+    {
+      officialMore: true,
+      hideMoreLabels: true,
+      config: {
+        more: ["skills"],
+        moreMode: "hover",
+        links: [{ id: "link-docs", label: "文档", url: "https://example.com" }],
+      },
+    },
+    async (f) => {
+      const more = f.document.querySelector(
+        'nav button[aria-haspopup="menu"]',
+      );
+      more.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      assert.equal(
+        f.document.querySelector('[role="menu"]'),
+        null,
+        "the native menu waits for a short hover intent before opening",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 220));
+      await f.flush();
+      assert.equal(more.getAttribute("aria-expanded"), "true");
+      const extra = f.document.querySelector("[data-lso-native-extra]");
+      assert.equal(
+        extra.querySelectorAll("[data-lso-entry]").length,
+        2,
+        "hover opens the same native menu with organized rows",
+      );
+
+      more.dispatchEvent(new f.window.MouseEvent("mouseleave"));
+      f.document
+        .querySelector('[role="menu"]')
+        .dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      await new Promise((resolve) => setTimeout(resolve, 260));
+      assert.ok(
+        f.document.querySelector('[role="menu"]'),
+        "moving from More into the native menu keeps it open",
+      );
+
+      f.document
+        .querySelector('[role="menu"]')
+        .dispatchEvent(new f.window.MouseEvent("mouseleave"));
+      await new Promise((resolve) => setTimeout(resolve, 260));
+      await f.flush();
+      assert.equal(
+        f.document.querySelector('[role="menu"]'),
+        null,
+        "leaving the native menu dismisses it again",
+      );
+      assert.equal(more.getAttribute("aria-expanded"), "false");
+
+      await f.click('[data-lso-official-trigger]');
+      more.dispatchEvent(new f.window.MouseEvent("mouseleave"));
+      await new Promise((resolve) => setTimeout(resolve, 260));
+      assert.ok(
+        f.document.querySelector('[role="menu"]'),
+        "a menu opened by click stays open when the pointer leaves",
+      );
+      await f.click('[data-lso-official-trigger]');
+    },
+  ));
+
+test("the native More button stays native when there is nothing to organize", async () =>
+  using({ officialMore: true }, async (f) => {
+    assert.ok(
+      f.document.querySelector(
+        'nav button[aria-haspopup="menu"]:not([data-lso-trigger])',
+      ),
+      "the host More button is untouched",
+    );
+    assert.equal(f.document.querySelector("[data-lso-trigger]"), null);
+    await f.click('nav button[aria-haspopup="menu"]');
+    assert.equal(
+      f.document.querySelector("[data-lso-native-extra]"),
+      null,
+      "an empty organizer does not add rows to the native menu",
+    );
+    assert.equal(
+      f.document.querySelectorAll('[role="menu"] [role="menuitem"]').length,
+      2,
+      "the host menu keeps its own two actions",
+    );
+  }));
+
+test("a native More button accepts entries dragged out of the sidebar", async () =>
+  using(
+    {
+      officialMore: true,
+      config: {
+        links: [{ id: "link-docs", label: "文档", url: "https://example.com" }],
+      },
+    },
+    async (f) => {
+      const node = f.document.querySelector(
+        'nav button[aria-label="技能中心"]',
+      );
+      const more = f.document.querySelector(
+        'nav button[aria-haspopup="menu"]',
+      );
+      node.getBoundingClientRect = () => ({
+        top: 60,
+        bottom: 100,
+        left: 10,
+        right: 250,
+        width: 240,
+        height: 40,
+        x: 10,
+        y: 60,
+        toJSON() {},
+      });
+      more.getBoundingClientRect = () => ({
+        top: 120,
+        bottom: 160,
+        left: 10,
+        right: 250,
+        width: 240,
+        height: 40,
+        x: 10,
+        y: 120,
+        toJSON() {},
+      });
+      await act(async () =>
+        node.dispatchEvent(
+          new f.window.MouseEvent("pointerdown", {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+            clientX: 40,
+            clientY: 80,
+          }),
+        ),
+      );
+      await act(async () =>
+        more.dispatchEvent(
+          new f.window.MouseEvent("pointermove", {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+            clientX: 40,
+            clientY: 140,
+          }),
+        ),
+      );
+      assert.equal(
+        more.getAttribute("data-lso-target"),
+        "true",
+        "the native More row is the drop target",
+      );
+      await act(async () =>
+        more.dispatchEvent(
+          new f.window.MouseEvent("pointerup", {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+            clientX: 40,
+            clientY: 140,
+          }),
+        ),
+      );
+      const saved = JSON.parse(f.window.localStorage.getItem(configKey));
+      assert.ok(saved.more.includes("skills"));
+      assert.equal(node.style.display, "none");
+      assert.equal(f.document.querySelector("[data-lso-trigger]"), null);
+    },
+  ));
+
+test("a selected hidden panel is promoted outside the native More anchor wrapper", async () =>
+  using(
+    {
+      officialMore: true,
+      config: { more: ["context"] },
+    },
+    async (f) => {
+      const hidden = f.document.querySelector(
+        'nav button[aria-label="上下文洞察"]',
+      );
+      const more = f.document.querySelector(
+        'nav button[aria-haspopup="menu"]',
+      );
+      hidden.setAttribute("aria-current", "page");
+      await f.flush();
+      const proxy = f.document.querySelector(
+        'nav > [data-lso-selection="context"]',
+      );
+      assert.ok(proxy, "the active hidden panel is shown in the sidebar");
+      assert.equal(
+        proxy.nextElementSibling,
+        more.parentElement,
+        "the proxy sits before the native anchor wrapper, not inside it",
+      );
+      assert.equal(
+        more.parentElement.contains(proxy),
+        false,
+        "the React-owned menu anchor keeps exactly its own child",
+      );
+      assert.equal(
+        more.parentElement.contains(more),
+        true,
+        "the native More button remains in its anchor wrapper",
+      );
+    },
+  ));
+
+test("More expands in place and restores entry names while the sidebar is open", async () =>
   using(
     {
       config: { more: ["skills", "context"] },
@@ -50,10 +356,9 @@ test("More expands in place, restores entry names, and previews on hover while t
         .querySelector('nav button[aria-label="上下文洞察"]')
         .setAttribute("aria-current", "page");
       await f.flush();
-      assert.equal(
+      assert.ok(
         f.document.querySelector('nav > [data-lso-selection="context"]'),
-        null,
-        "an open inline More never duplicates the newly selected entry",
+        "an open inline More keeps the newly selected entry pinned above it",
       );
       await f.click("[data-lso-trigger]");
       assert.ok(
@@ -61,25 +366,20 @@ test("More expands in place, restores entry names, and previews on hover while t
         "the selected hidden entry is promoted after closing More",
       );
       trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
-      const popover = f.document.querySelector(".lso-popover");
-      assert.ok(
-        popover,
-        "hovering More while the sidebar is open shows the floating preview",
-      );
+      await new Promise((resolve) => setTimeout(resolve, 220));
       assert.equal(
-        popover.querySelector('[data-lso-entry="skills"] .lso-item-label')
-          .textContent,
-        "技能中心",
-        "the floating preview keeps readable entry names",
+        menu.hidden,
+        true,
+        "click mode keeps More closed while the pointer only hovers",
       );
     },
   ));
 
-test("the collapsed hover menu keeps readable labels, selected state, and the native row width", async () =>
+test("hover mode keeps readable labels and selected state in the collapsed rail", async () =>
   using(
     {
       collapsed: true,
-      config: { more: ["skills", "context"] },
+      config: { more: ["skills", "context"], moreMode: "hover" },
       hideMoreLabels: true,
     },
     async (f) => {
@@ -87,75 +387,48 @@ test("the collapsed hover menu keeps readable labels, selected state, and the na
         .querySelector('nav button[aria-label="上下文洞察"]')
         .setAttribute("aria-current", "page");
       await f.flush();
-      f.document.querySelector("nav").style.background = "rgb(46, 46, 46)";
       const trigger = f.document.querySelector("[data-lso-trigger]");
+      const menu = f.document.querySelector(".lso-menu");
+      assert.equal(menu.hidden, true);
       trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
-      const popover = f.document.querySelector(".lso-popover");
-      assert.equal(popover.hidden, false);
-      assert.equal(popover.children.length, 3);
+      await new Promise((resolve) => setTimeout(resolve, 220));
+      await f.flush();
       assert.equal(
-        popover.style.getPropertyValue("--lso-popover-bg"),
-        "rgb(46, 46, 46)",
-        "the popup samples the covering sidebar surface",
+        menu.hidden,
+        false,
+        "hovering More expands the inline menu after the intent delay",
       );
       assert.equal(
-        popover
+        menu
           .querySelector('[data-lso-entry="context"]')
           .getAttribute("data-lso-selected"),
         "true",
       );
-      const popupRow = popover.querySelector('[data-lso-entry="skills"]');
       assert.equal(
-        popupRow.querySelector(".lso-item-label").textContent,
+        menu.querySelector('[data-lso-entry="skills"] .lso-item-label')
+          .textContent,
         "技能中心",
+        "the hover menu keeps readable entry names",
       );
-      assert.equal(
-        popupRow.style.paddingLeft,
-        "12px",
-        "the popup gives the label room even when the rail row has no padding",
-      );
-      assert.equal(
-        popupRow.style.margin,
-        "0px 2px",
-        "the popup keeps the native row inline margins",
-      );
-      const dragHint = popover.querySelector(".lso-popover-hint");
-      assert.equal(dragHint.textContent, "拖拽入口或链接可自定义排序");
-      assert.equal(dragHint.getAttribute("role"), "note");
-      assert.equal(dragHint, popover.lastElementChild);
-      assert.equal(dragHint.style.order, "999999");
-      assert.equal(f.window.getComputedStyle(dragHint).pointerEvents, "none");
       const pluginCss = f.document.querySelector("[data-lso-style]").textContent;
-      assert.match(
+      assert.doesNotMatch(
         pluginCss,
-        /\.lso-popover\{[^}]*padding:8px 12px 4px;[^}]*background:var\(--lso-popover-bg,var\(--dsw-alias-bg-layer-2/,
-        "the popup has a roomier top inset and uses the sampled sidebar surface",
+        /\.lso-popover/,
+        "the floating popover styles are gone",
       );
-      assert.match(
-        pluginCss,
-        /\.lso-popover::before\{content:none\}/,
-        "no extra menu tint is layered over the sidebar surface",
-      );
-      assert.match(
-        pluginCss,
-        /\.lso-popover-hint\{[^}]*gap:6px;margin:3px 2px 0;padding:6px 8px[^}]*font-size:11px/,
-        "the footer hint shares the sidebar row insets",
-      );
+
+      trigger.dispatchEvent(new f.window.MouseEvent("mouseleave"));
+      menu.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      await new Promise((resolve) => setTimeout(resolve, 220));
       assert.equal(
-        popover.style.width,
-        "260px",
-        "when host layout is unavailable the popover uses its native sidebar width fallback",
+        menu.hidden,
+        false,
+        "moving the pointer onto the menu keeps it open",
       );
-      await f.click('.lso-popover [data-lso-entry="skills"]');
-      assert.ok(
-        f.document.querySelector(".lso-popover"),
-        "choosing an entry keeps the floating menu open",
-      );
-      await f.click('.lso-popover [data-lso-entry="context"]');
-      assert.ok(
-        f.document.querySelector(".lso-popover"),
-        "the floating menu stays open for consecutive switches",
-      );
+
+      menu.dispatchEvent(new f.window.MouseEvent("mouseleave"));
+      await new Promise((resolve) => setTimeout(resolve, 220));
+      assert.equal(menu.hidden, true, "leaving the menu collapses it again");
     },
   ));
 
@@ -185,7 +458,7 @@ test("a transient empty slot snapshot does not erase saved order or More prefere
     },
   ));
 
-test("the promoted hidden panel persists until another entry is selected or More expands", async () =>
+test("the promoted hidden panel persists until another entry is selected", async () =>
   using({ config: { more: ["skills"] } }, async (f) => {
     const trigger = f.document.querySelector("[data-lso-trigger]");
     const hidden = f.document.querySelector(
@@ -227,15 +500,19 @@ test("the promoted hidden panel persists until another entry is selected or More
       f.document.querySelector('.lso-menu [data-lso-entry="skills"]'),
       "the expanded menu already shows the selected entry",
     );
-    assert.equal(
+    assert.ok(
       promoted(),
-      null,
-      "the expanded menu does not add a duplicate sidebar row",
+      "the promoted row stays put while the menu is open",
+    );
+    assert.equal(
+      f.document.querySelectorAll('nav > [data-lso-selection="skills"]').length,
+      1,
+      "the open menu never adds a second copy of the promoted row",
     );
     await f.click("[data-lso-trigger]");
     assert.ok(
       promoted(),
-      "the promoted row returns after collapsing the in-place menu",
+      "the promoted row survives collapsing the in-place menu",
     );
 
     trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
@@ -254,13 +531,14 @@ test("the promoted hidden panel persists until another entry is selected or More
     assert.equal(proxy.nextElementSibling, trigger);
     assert.equal(trigger.getAttribute("data-lso-active"), "false");
     assert.equal(trigger.hasAttribute("aria-current"), false);
-    assert.ok(
-      f.document.querySelector(".lso-popover"),
-      "hovering More while the sidebar is open shows the floating menu",
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    assert.equal(
+      f.document.querySelector(".lso-menu").hidden,
+      true,
+      "click mode does not open More when the pointer only hovers",
     );
     await f.click('nav > [data-lso-selection="skills"]');
     assert.equal(clicked, 1, "the promoted row opens the native panel");
-    assert.equal(f.document.querySelector(".lso-popover"), null);
     assert.ok(promoted(), "clicking the promoted row does not remove it");
     assert.equal(trigger.getAttribute("aria-expanded"), "false");
 
@@ -309,11 +587,11 @@ test("alternate host selection markers refresh the promoted row", async () =>
     assert.equal(promoted(), null);
   }));
 
-test("a promoted rail row keeps its icon width and the floating menu widens enough to read names", async () =>
+test("a promoted rail row keeps its icon width while the hover menu stays readable", async () =>
   using(
     {
       collapsed: true,
-      config: { more: ["skills"] },
+      config: { more: ["skills"], moreMode: "hover" },
       hideMoreLabels: true,
     },
     async (f) => {
@@ -359,66 +637,46 @@ test("a promoted rail row keeps its icon width and the floating menu widens enou
       const trigger = f.document.querySelector("[data-lso-trigger]");
       trigger.getBoundingClientRect = () => rect(36);
       trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
-      const popover = f.document.querySelector(".lso-popover");
-      assert.ok(popover);
+      await new Promise((resolve) => setTimeout(resolve, 220));
+      await f.flush();
+      const menu = f.document.querySelector(".lso-menu");
+      assert.equal(menu.hidden, false);
       assert.equal(
-        popover.style.width,
-        "240px",
-        "the floating menu is wide enough for entry names",
-      );
-      assert.equal(
-        popover.querySelector('[data-lso-entry="skills"] .lso-item-label')
+        menu.querySelector('[data-lso-entry="skills"] .lso-item-label')
           .textContent,
         "技能中心",
       );
     },
   ));
 
-test("moving from the floating More menu onto the promoted row does not close it or flicker", async () =>
+test("moving from More onto the open hover menu keeps it open and Escape collapses it", async () =>
   using(
     {
       collapsed: true,
-      config: { more: ["skills"] },
+      config: { more: ["skills"], moreMode: "hover" },
       hideMoreLabels: true,
     },
     async (f) => {
       const hidden = f.document.querySelector(
         'nav button[aria-label="技能中心"]',
       );
-      let clicked = 0;
-      hidden.addEventListener("click", () => clicked++);
       hidden.setAttribute("aria-current", "page");
       await f.flush();
       const trigger = f.document.querySelector("[data-lso-trigger]");
+      const menu = f.document.querySelector(".lso-menu");
       trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
-      const proxy = f.document.querySelector(
-        'nav > [data-lso-selection="skills"]',
-      );
-      assert.ok(proxy);
-      assert.ok(f.document.querySelector(".lso-popover"));
+      await new Promise((resolve) => setTimeout(resolve, 220));
+      await f.flush();
+      assert.equal(menu.hidden, false);
 
       trigger.dispatchEvent(new f.window.MouseEvent("mouseleave"));
-      proxy.dispatchEvent(new f.window.MouseEvent("mouseenter"));
-      await new Promise((resolve) => setTimeout(resolve, 180));
-      assert.ok(
-        f.document.querySelector(".lso-popover"),
-        "the pointer crossing onto the promoted row keeps the menu open",
-      );
+      menu.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      await new Promise((resolve) => setTimeout(resolve, 220));
       assert.equal(
-        f.document.querySelector('nav > [data-lso-selection="skills"]'),
-        proxy,
+        menu.hidden,
+        false,
+        "the pointer crossing onto the open menu keeps it open",
       );
-
-      await f.click('nav > [data-lso-selection="skills"]');
-      assert.equal(clicked, 1);
-      assert.equal(f.document.querySelector(".lso-popover"), null);
-      assert.ok(
-        f.document.querySelector('nav > [data-lso-selection="skills"]'),
-        "the promoted row stays after it is selected",
-      );
-
-      trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
-      assert.ok(f.document.querySelector(".lso-popover"));
       await act(async () =>
         f.document.dispatchEvent(
           new f.window.KeyboardEvent("keydown", {
@@ -428,11 +686,42 @@ test("moving from the floating More menu onto the promoted row does not close it
           }),
         ),
       );
-      assert.equal(f.document.querySelector(".lso-popover"), null);
+      assert.equal(menu.hidden, true);
       assert.ok(
         f.document.querySelector('nav > [data-lso-selection="skills"]'),
         "Escape closes the menu without removing the promoted row",
       );
+    },
+  ));
+
+test("returning from the hover menu to More keeps it open", async () =>
+  using(
+    {
+      collapsed: true,
+      config: { more: ["skills"], moreMode: "hover" },
+    },
+    async (f) => {
+      const trigger = f.document.querySelector("[data-lso-trigger]");
+      const menu = f.document.querySelector(".lso-menu");
+      trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      await new Promise((resolve) => setTimeout(resolve, 220));
+      await f.flush();
+      assert.equal(menu.hidden, false);
+
+      trigger.dispatchEvent(new f.window.MouseEvent("mouseleave"));
+      menu.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      menu.dispatchEvent(new f.window.MouseEvent("mouseleave"));
+      trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      await new Promise((resolve) => setTimeout(resolve, 260));
+      assert.equal(
+        menu.hidden,
+        false,
+        "the pending menu close is cancelled when the pointer returns to More",
+      );
+
+      trigger.dispatchEvent(new f.window.MouseEvent("mouseleave"));
+      await new Promise((resolve) => setTimeout(resolve, 260));
+      assert.equal(menu.hidden, true, "leaving More still closes the hover menu");
     },
   ));
 
@@ -529,9 +818,9 @@ test("a fixed sidebar entry accepts drags from More so the only remaining row ca
         "true",
         "the fixed row is available as an outside drop anchor",
       );
-      trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+      await f.click("[data-lso-trigger]");
       const popupRow = f.document.querySelector(
-        '.lso-popover [data-lso-entry="skills"]',
+        '.lso-menu [data-lso-entry="skills"]',
       );
       assert.ok(popupRow);
       plugin.getBoundingClientRect = () => ({
@@ -624,12 +913,12 @@ test("a fixed sidebar entry accepts drags from More so the only remaining row ca
     },
   ));
 
-test("dragging from the floating More menu keeps the original row dimmed instead of rebuilding it", async () =>
+test("dragging from the open More menu keeps the original row dimmed instead of rebuilding it", async () =>
   using({ collapsed: true, config: { more: ["skills"] } }, async (f) => {
     const trigger = f.document.querySelector("[data-lso-trigger]");
-    trigger.dispatchEvent(new f.window.MouseEvent("mouseenter"));
+    await f.click("[data-lso-trigger]");
     const row = f.document.querySelector(
-      '.lso-popover [data-lso-entry="skills"]',
+      '.lso-menu [data-lso-entry="skills"]',
     );
     row.getBoundingClientRect = () => ({
       top: 100,
@@ -665,12 +954,12 @@ test("dragging from the floating More menu keeps the original row dimmed instead
       ),
     );
     const current = f.document.querySelector(
-      '.lso-popover [data-lso-entry="skills"]',
+      '.lso-menu [data-lso-entry="skills"]',
     );
-    assert.equal(current, row, "the dragged floating row survives drag start");
+    assert.equal(current, row, "the dragged menu row survives drag start");
     assert.equal(current.getAttribute("data-lso-dragging"), "true");
     assert.equal(f.window.getComputedStyle(current).opacity, "0.35");
-    assert.equal(f.document.querySelectorAll(".lso-popover").length, 1);
+    assert.equal(f.document.querySelectorAll(".lso-menu").length, 1);
     await act(async () =>
       f.document.dispatchEvent(
         new f.window.MouseEvent("pointercancel", { bubbles: true }),
@@ -770,6 +1059,34 @@ test("settings describe the current More state and only activate More for hidden
       f.document.querySelector('[aria-label="移出更多 技能中心"]'),
       "the toggle names the action needed to leave More",
     );
+  }));
+
+test("settings switch the More trigger between click and hover", async () =>
+  using({}, async (f) => {
+    await f.settings();
+    const clickMode = () =>
+      f.document.querySelector('[data-lso-mode="click"]');
+    const hoverMode = () =>
+      f.document.querySelector('[data-lso-mode="hover"]');
+    assert.equal(
+      clickMode().getAttribute("aria-checked"),
+      "true",
+      "click is the default open mode",
+    );
+    assert.equal(hoverMode().getAttribute("aria-checked"), "false");
+    await act(async () => hoverMode().click());
+    assert.equal(
+      JSON.parse(f.window.localStorage.getItem(configKey)).moreMode,
+      "hover",
+    );
+    assert.equal(hoverMode().getAttribute("aria-checked"), "true");
+    assert.equal(clickMode().getAttribute("aria-checked"), "false");
+    await act(async () => clickMode().click());
+    assert.equal(
+      JSON.parse(f.window.localStorage.getItem(configKey)).moreMode,
+      "click",
+    );
+    assert.equal(clickMode().getAttribute("aria-checked"), "true");
   }));
 
 test("settings reject duplicate shortcuts, report the conflict, and accept arrow shortcuts", async () =>
@@ -1184,7 +1501,7 @@ test("drag insertion marker and drop use the nearest row edge when the pointer i
     assert.match(f.window.getComputedStyle(marker).borderRadius, /0px|^0$/);
     assert.match(
       f.document.querySelector("[data-lso-style]").textContent,
-      /html\[data-lso-drag-active=true\] \.lso-popover :hover,html\[data-lso-drag-active=true\] \[role=menu\] :hover\{background:transparent!important/,
+      /html\[data-lso-drag-active=true\] nav\[aria-label\] :hover,html\[data-lso-drag-active=true\] \[role=menu\] :hover\{background:transparent!important/,
     );
     await act(async () =>
       node.dispatchEvent(

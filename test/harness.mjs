@@ -44,9 +44,13 @@ export async function fixture({
   slotEntries = entries,
   collapsed = false,
   hideMoreLabels = false,
+  officialMore = false,
 } = {}) {
   const liveEntries = slotEntries.slice();
   const hiddenIds = new Set((config && config.more) || []);
+  const officialButton = officialMore
+    ? '<span class="moreAnchor"><button aria-label="更多" aria-haspopup="menu" aria-expanded="false"><svg><path d="M0 0"></path></svg><span>更多</span></button></span>'
+    : "";
   const nav = `<nav aria-label="全局面板">${liveEntries
     .map((entry) => {
       const label =
@@ -55,7 +59,7 @@ export async function fixture({
           : `<span>${entry.options.label}</span>`;
       return `<button aria-label="${entry.options.label}"><svg><path d="M0 0"></path></svg>${label}</button>`;
     })
-    .join("")}</nav>`;
+    .join("")}${officialButton}</nav>`;
   const shell = collapsed
     ? `<div data-test-frame data-sidebar-collapsed><div data-test-column><div data-window-drag><button aria-label="收起侧边栏"></button></div>${nav}</div><div data-shell-leading><button aria-label="打开侧边栏"></button><button aria-label="新建会话"></button></div></div>`
     : nav;
@@ -128,6 +132,26 @@ export async function fixture({
       });
   const slots = new Map(),
     disposers = [];
+  let officialMenu = null;
+  const officialTrigger = document.querySelector(
+    'nav button[aria-haspopup="menu"]',
+  );
+  if (officialTrigger) {
+    officialTrigger.addEventListener("click", () => {
+      if (officialMenu) {
+        officialMenu.remove();
+        officialMenu = null;
+        officialTrigger.setAttribute("aria-expanded", "false");
+        return;
+      }
+      officialMenu = document.createElement("div");
+      officialMenu.setAttribute("role", "menu");
+      officialMenu.innerHTML =
+        '<div role="presentation"><div data-slot="sidebar.panellist.actions"><button role="menuitem">浏览更多插件</button><button role="menuitem">创建你的插件</button></div></div>';
+      document.body.appendChild(officialMenu);
+      officialTrigger.setAttribute("aria-expanded", "true");
+    });
+  }
   const frame = document.querySelector("[data-test-frame]");
   const column = document.querySelector("[data-test-column]");
   let collapsedState = collapsed;
