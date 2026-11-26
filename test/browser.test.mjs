@@ -62,6 +62,7 @@ test("real Chromium keeps More visible and renders one anchored drag line", asyn
         "liao-sidebar-organizer.config",
         JSON.stringify({
           more: ["skills", "context", "schedule", "ssh"],
+          showCurrentEntry: true,
           order: [],
           shortcuts: {},
           links: [],
@@ -209,6 +210,63 @@ test("real Chromium keeps More visible and renders one anchored drag line", asyn
   }
 });
 
+test("real Chromium keeps the pin inside the selected inline row", async (t) => {
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true, channel: "chrome" });
+  } catch (error) {
+    t.skip(`Chrome is unavailable: ${error.message}`);
+    return;
+  }
+
+  try {
+    const sidebar = await fixture({
+      officialMore: true,
+      config: { more: ["skills"] },
+      panelNavigation: true,
+    });
+    let markup, css;
+    try {
+      await sidebar.setActivePanel("skills");
+      await sidebar.click("[data-lso-official-trigger]");
+      markup = sidebar.document.querySelector("[data-lso-inline]").outerHTML;
+      css = sidebar.document.querySelector("[data-lso-style]").textContent;
+    } finally {
+      await sidebar.close();
+    }
+
+    const page = await browser.newPage();
+    await page.setContent(`<style>${css}</style><div style="width:260px">${markup}</div>`);
+    const row = page.locator(".lso-inline-row");
+    const pin = row.locator(".lso-inline-pin");
+    await row.hover();
+    const layout = await row.evaluate((wrapper) => {
+      const [entry, pin] = wrapper.children;
+      const bounds = wrapper.getBoundingClientRect();
+      const action = pin.getBoundingClientRect();
+      const navigation = entry.getBoundingClientRect();
+      return {
+        entryRight: navigation.right,
+        rowRight: bounds.right,
+        pinRight: action.right,
+        pinLeft: action.left,
+        labelRight: entry.querySelector(".lso-item-label").getBoundingClientRect().right,
+        selected: getComputedStyle(entry).backgroundColor,
+        pinBackground: getComputedStyle(pin).backgroundColor,
+      };
+    });
+    assert.equal(layout.pinRight, layout.rowRight);
+    assert.equal(layout.entryRight, layout.rowRight);
+    assert.ok(layout.labelRight < layout.pinLeft);
+    assert.notEqual(layout.selected, "rgba(0, 0, 0, 0)");
+    assert.equal(layout.pinBackground, "rgba(0, 0, 0, 0)");
+    await pin.hover();
+    assert.equal(await pin.evaluate((button) => getComputedStyle(button).backgroundColor), "rgba(0, 0, 0, 0)");
+  } finally {
+    await browser.close();
+  }
+});
+
 test("real Chromium renders the card-based settings layout and reflows on narrow widths", async (t) => {
   let browser;
   try {
@@ -264,8 +322,8 @@ test("real Chromium renders the card-based settings layout and reflows on narrow
     );
     assert.equal(
       await page.locator(".lso-settings-section").count(),
-      5,
-      "More mode, peek, display compatibility, entries and links are grouped into card sections",
+      6,
+      "display, entries, links, and backup have separate settings sections",
     );
     const layout = await page.evaluate(() => {
       const settings = document.querySelector(".lso-settings");
@@ -286,7 +344,7 @@ test("real Chromium renders the card-based settings layout and reflows on narrow
     assert.notEqual(layout.sectionBackground, "rgba(0, 0, 0, 0)");
     assert.equal(layout.sectionRadius, "12px");
     assert.equal(layout.rowColumns, 3);
-    assert.equal(layout.formColumns, 3);
+    assert.equal(layout.formColumns, 4);
     assert.ok(layout.settingsWidth <= 800);
     assert.match(layout.packageShown, /dsh-client-ui-skill-explorer/);
     const inlineRow = await page.evaluate(() => {
@@ -313,8 +371,9 @@ test("real Chromium renders the card-based settings layout and reflows on narrow
       "the inline shortcut control keeps entry rows compact",
     );
 
-    await page.locator("details summary").click();
-    assert.equal(await page.locator("details").getAttribute("open"), "");
+    const links = page.locator("details").filter({ has: page.locator(".lso-link-form") });
+    await links.locator("summary").click();
+    assert.equal(await links.getAttribute("open"), "");
     if (process.env.LSO_SCREENSHOT)
       await page.screenshot({
         path: process.env.LSO_SCREENSHOT,

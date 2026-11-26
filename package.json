@@ -1,6 +1,7 @@
 {
   "name": "dsh-liao-sidebar",
-  "version": "0.2.9",
+  "version": "0.3.0",
+  "icon": "assets/icon.svg",
   "description": "侧栏管家：整理侧栏入口、设置快捷键并添加自定义链接。",
   "license": "MIT",
   "type": "module",
@@ -12,6 +13,7 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "assets/icon.svg",
     "lib/index.js",
     "lib/client.js",
     "locale/zh.json",
@@ -66,7 +68,9 @@
       "dshReleases": {
         "0.2.0-rc.2": "compatible",
         "0.2.1-rc.2": "compatible",
-        "0.2.2-rc.3": "compatible"
+        "0.2.2-rc.3": "compatible",
+        "0.2.2-rc.5": "compatible",
+        "0.2.3-alpha.2": "compatible"
       }
     }
   },

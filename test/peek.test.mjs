@@ -28,7 +28,7 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
       f.frame.style.getPropertyValue("--lso-peek-grid"),
       /minmax\(0,\s*1fr\)/,
     );
-    const strip = f.column.querySelector("[data-window-drag]");
+    const strip = f.column.querySelector("[data-window-drag] button");
     assert.equal(strip.hasAttribute("data-lso-peek-hidden"), true);
     assert.equal(
       f.document.querySelectorAll("[data-lso-peek-leading]").length,
@@ -54,19 +54,8 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
       ["打开侧边栏", "新建会话"],
       "both host controls are cloned before the host removes them",
     );
-    const peekTop = parseInt(
-        f.frame.style.getPropertyValue("--lso-peek-top"),
-        10,
-      ),
-      peekHeight = parseInt(
-        f.frame.style.getPropertyValue("--lso-peek-height"),
-        10,
-      );
-    assert.equal(
-      peekHeight,
-      Math.max(320, Math.round((f.window.innerHeight - peekTop - 12) * 0.8)),
-      "the floating preview uses four fifths of the available height",
-    );
+    assert.match(f.document.querySelector("[data-lso-style]").textContent,
+      /\[data-lso-peek\] \[data-lso-peek-column\]\{[^}]*inset:0 auto 0 0!important;[^}]*height:100%!important/);
     assert.equal(f.toggles(), 1);
     assert.equal(f.collapsed(), false);
 
@@ -222,7 +211,7 @@ test("the floating sidebar keeps its native width on narrow windows", async () =
 
     Object.defineProperty(f.window, "innerWidth", {
       configurable: true,
-      value: 400,
+      value: 260,
     });
     Object.defineProperty(f.window, "innerHeight", {
       configurable: true,
@@ -233,20 +222,15 @@ test("the floating sidebar keeps its native width on narrow windows", async () =
     await f.flush();
     assert.equal(
       f.frame.style.getPropertyValue("--lso-peek-width"),
-      "280px",
-      "narrow windows keep the minimum width instead of introducing horizontal scrolling",
-    );
-    assert.ok(
-      parseInt(f.frame.style.getPropertyValue("--lso-peek-height"), 10) <=
-        300,
-      "the preview height stays within the viewport",
+      "260px",
+      "the preview narrows to fit a viewport smaller than the sidebar",
     );
   } finally {
     await f.close();
   }
 });
 
-test("preview fades and slides both in and out", async () => {
+test("preview slides in from the left and exits beyond the edge", async () => {
   const f = await fixture({ collapsed: true });
   const animations = [];
   try {
@@ -275,8 +259,7 @@ test("preview fades and slides both in and out", async () => {
 
     assert.equal(animations.length, 1);
     assert.equal(animations[0].options.duration, 180);
-    assert.equal(animations[0].frames[0].opacity, 0);
-    assert.equal(animations[0].frames[0].translate, "-10px 0px");
+    assert.equal(animations[0].frames[0].translate, "-100% 0px");
 
     f.document.body.dispatchEvent(
       new f.window.MouseEvent("pointermove", { bubbles: true }),
@@ -284,8 +267,7 @@ test("preview fades and slides both in and out", async () => {
     await sleep(220);
     assert.equal(animations.length, 2);
     assert.equal(animations[1].options.duration, 120);
-    assert.equal(animations[1].frames[1].opacity, 0);
-    assert.equal(animations[1].frames[1].translate, "-6px 0px");
+    assert.equal(animations[1].frames[1].translate, "-100% 0px");
     assert.equal(
       f.column.hasAttribute("data-lso-peek-closing"),
       true,
@@ -660,7 +642,10 @@ test("choosing an entry from the official More menu keeps the preview open", asy
     await f.flush();
     assert.equal(f.frame.hasAttribute("data-lso-peek"), true);
 
-    await f.click("[data-lso-official-trigger]");
+    f.document.querySelector("[data-lso-official-trigger]").dispatchEvent(
+      new f.window.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
+    );
+    await f.flush();
     const row = f.document.querySelector(
       '[role="menu"] .sidebarEntry button[role="menuitem"]:not([aria-label])',
     );

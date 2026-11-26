@@ -28,6 +28,7 @@ try {
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
+    "assets/icon.svg",
     "cordis.patch.yml",
     "dsh-plugin.naming.json",
     "docs/detail.en.md",
@@ -54,6 +55,7 @@ try {
   const manifest = JSON.parse(read("package.json"));
   assert.equal(manifest.name, "dsh-liao-sidebar");
   assert.equal(manifest.version, packageVersion);
+  assert.equal(manifest.icon, "assets/icon.svg");
   assert.equal(JSON.parse(read("locale/zh.json")).meta.title, "侧栏管家");
   for (const language of ["zh", "en"]) {
     const detail = JSON.parse(read(`locale/${language}.json`)).meta.detail;
@@ -79,10 +81,8 @@ try {
       /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="640" height="300"/,
       `${image[1]} keeps the 640x300 size the plugin page renders it at`,
     );
-    assert.ok(
-      svg.length > 10000,
-      `${image[1]} must carry its artwork`,
-    );
+    assert.match(svg, /<title[^>]*>[^<]+<\/title>/, `${image[1]} must describe its illustration`);
+    assert.match(svg, /<path\b[^>]*\bd="[^"]+"/, `${image[1]} must contain vector artwork`);
   }
   assert.match(
     read("lib/client.js"),
@@ -129,7 +129,7 @@ try {
       `DSH ${loaderVersion} must be listed in dsh.compatibility.dshReleases before packing`,
     );
   }
-  f = await fixture({ source: read("lib/client.js"), loaderSource });
+  f = await fixture({ source: read("lib/client.js"), loaderSource, loaderVersion });
   assert.equal(
     f.document.querySelector("[data-lso-trigger]"),
     null,

@@ -41,6 +41,7 @@ export async function fixture({
   legacyConfig,
   source,
   loaderSource,
+  loaderVersion,
   slotEntries = entries,
   collapsed = false,
   hideMoreLabels = false,
@@ -52,7 +53,7 @@ export async function fixture({
   const liveEntries = slotEntries.slice();
   const hiddenIds = new Set((config && config.more) || []);
   const officialButton = officialMore
-    ? '<span class="moreAnchor"><button aria-label="更多" aria-haspopup="menu" aria-expanded="false"><svg><path d="M0 0"></path></svg><span>更多</span></button></span>'
+    ? '<span class="moreAnchor"><button aria-label="更多" aria-haspopup="menu" aria-expanded="false"><svg><path d="M0 0"></path></svg><span class="panelTitle">更多</span></button></span>'
     : "";
   const nav = `<nav aria-label="${navLabel}">${liveEntries
     .map((entry) => {
@@ -117,7 +118,9 @@ export async function fixture({
     window.__ModuleLoader__ = target;
     modules = new bootstrap.exports.ClientModuleSystem({
       manifest: { modules: [] },
-      staticModules: { react: React },
+      staticModules: /^0\.2\.3(?:[-.]|$)/.test(loaderVersion || "")
+        ? [{ id: "react", factory: () => React }]
+        : { react: React },
       registrationTarget: target,
       bootstrapModule: bootstrap,
     });
@@ -153,7 +156,7 @@ export async function fixture({
         .filter((entry) => officialMoreEntries.includes(entry.options.id))
         .map(
           (entry) =>
-          `<div class="sidebarEntry"><button role="menuitem"><span>${entry.options.label}</span></button><span class="pinAnchor"><button role="menuitem" class="pinButton" aria-label="将${entry.options.label}固定到侧边栏"><svg data-icon="dsw-icon-pin-outline-regular"></svg>固定</button></span></div>`,
+          `<div class="sidebarEntry"><button role="menuitem"><svg data-icon="panel-${entry.options.id}"></svg><span>${entry.options.label}</span></button><span class="pinAnchor"><button role="menuitem" class="pinButton" aria-label="将${entry.options.label}固定到侧边栏"><svg data-icon="dsw-icon-pin-outline-regular"></svg>固定</button></span></div>`,
         )
         .join("");
       officialMenu.innerHTML =

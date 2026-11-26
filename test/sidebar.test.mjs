@@ -12,6 +12,52 @@ async function using(options, fn) {
   }
 }
 
+async function openNativeMore(f) {
+  const trigger = f.document.querySelector("[data-lso-official-trigger]");
+  trigger.dispatchEvent(new f.window.KeyboardEvent("keydown", {
+    key: "ArrowDown", bubbles: true, cancelable: true,
+  }));
+  await f.flush();
+}
+
+test("click expands the native sidebar inline until the user clicks Collapse", async () =>
+  using({
+    officialMore: true,
+    officialMoreEntries: ["context"],
+    panelNavigation: true,
+    slotEntries: entries.filter((entry) => entry.options.id !== "context"),
+    config: { more: ["skills"] },
+  }, async (f) => {
+    const trigger = f.document.querySelector("[data-lso-official-trigger]");
+    await f.setEntries(entries);
+    await f.click("[data-lso-official-trigger]");
+    const menu = f.document.querySelector("nav > [data-lso-inline]");
+    assert.equal(menu.previousElementSibling, trigger.parentElement);
+    assert.equal(menu.hidden, false);
+    assert.equal(trigger.textContent, "收起");
+    assert.equal(trigger.getAttribute("aria-controls"), menu.id);
+    assert.equal(f.document.querySelector('[role="menu"]'), null);
+    const rows = Array.from(menu.children);
+    assert.deepEqual(rows.map((row) => row.firstElementChild.getAttribute("data-lso-entry")), ["skills", "context"]);
+    for (const row of rows) {
+      const [entry, pin] = row.children;
+      assert.equal(entry.style.order, "", "the entry stays before the pin in every row");
+      assert.equal(entry.style.flex, "", "the pin can share the row with the entry");
+      assert.ok(pin.classList.contains("lso-inline-pin"));
+    }
+    await f.click('[data-lso-inline] [data-lso-entry="context"]');
+    assert.deepEqual(f.panelCalls(), ["context"]);
+    await f.setActivePanel("context");
+    assert.equal(menu.querySelector('[data-lso-entry="context"]').getAttribute("aria-current"), "page");
+    f.document.body.click();
+    f.document.dispatchEvent(new f.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    assert.equal(menu.hidden, false);
+    await f.click("[data-lso-official-trigger]");
+    assert.equal(menu.hidden, true);
+    assert.equal(trigger.textContent, "更多");
+    assert.equal(trigger.getAttribute("aria-expanded"), "false");
+  }));
+
 test("the official More button becomes the shared host for organized entries and links", async () =>
   using(
     {
@@ -19,6 +65,7 @@ test("the official More button becomes the shared host for organized entries and
       hideMoreLabels: true,
       config: {
         more: ["skills", "context"],
+        moreMode: "click",
         links: [{ id: "link-docs", label: "文档", url: "https://example.com" }],
       },
     },
@@ -56,7 +103,7 @@ test("the official More button becomes the shared host for organized entries and
       f.document
         .querySelector('nav button[aria-label="技能中心"]')
         .addEventListener("click", () => clicked++);
-      await f.click("[data-lso-official-trigger]");
+      await openNativeMore(f);
       const extra = f.document.querySelector("[data-lso-native-extra]");
       const slot = f.document.querySelector(
         '[data-slot="sidebar.panellist.actions"]',
@@ -88,7 +135,7 @@ test("the official More button becomes the shared host for organized entries and
           const id = node.getAttribute("data-lso-entry");
           assert.equal(
             Number(node.style.order),
-            savedOrder.indexOf(id) - 100,
+            savedOrder.indexOf(id) - 501,
             "plugin rows use the same order scale as official rows",
           );
         },
@@ -188,9 +235,10 @@ test("hover mode opens the official More menu on pointer intent and keeps it ope
       more.dispatchEvent(new f.window.MouseEvent("mouseleave"));
       await new Promise((resolve) => setTimeout(resolve, 260));
       assert.ok(
-        f.document.querySelector('[role="menu"]'),
+        !f.document.querySelector('[data-lso-inline]').hidden,
         "a menu opened by click stays open when the pointer leaves",
       );
+      assert.equal(f.document.querySelector('[role="menu"]'), null);
       await f.click('[data-lso-official-trigger]');
     },
   ));
@@ -299,11 +347,67 @@ test("a native More button accepts entries dragged out of the sidebar", async ()
     },
   ));
 
+test("More shows the active hidden icon by default and the settings switch controls the extra row", async () =>
+  using({ officialMore: true, config: { more: ["context"] } }, async (f) => {
+    const more = f.document.querySelector("[data-lso-official-trigger]");
+    const tail = more.querySelector("[data-lso-more-trailing]");
+    const selection = () => f.document.querySelector('[data-lso-selection="context"]');
+    const control = 'button[aria-labelledby="lso-settings-current-entry"]';
+    const source = f.document.querySelector('nav button[aria-label="上下文洞察"]');
+    source.setAttribute("aria-current", "page");
+    await f.flush();
+    assert.equal(selection(), null);
+    assert.equal(tail.getAttribute("data-panel"), "context");
+    assert.equal(tail.querySelectorAll("svg").length, 2);
+    assert.equal(more.getAttribute("aria-current"), "page");
+    await f.click("[data-lso-official-trigger]");
+    assert.equal(selection(), null);
+    assert.equal(tail.getAttribute("data-panel"), "context");
+    await f.click("[data-lso-official-trigger]");
+    await f.settings();
+    assert.equal(f.document.querySelector(control).getAttribute("aria-checked"), "false");
+    await f.click(control);
+    assert.ok(selection());
+    assert.equal(more.hasAttribute("aria-current"), false);
+    assert.equal(JSON.parse(f.window.localStorage.getItem(configKey)).showCurrentEntry, true);
+    await f.click(control);
+    assert.equal(selection(), null);
+    source.removeAttribute("aria-current");
+    await f.flush();
+    assert.equal(tail.getAttribute("data-panel"), "");
+    assert.equal(tail.querySelectorAll("svg").length, 1);
+  }));
+
+test("More retains the selected icon for a panel that was only rendered in the menu", async () =>
+  using(
+    {
+      officialMore: true,
+      officialMoreEntries: ["context"],
+      panelNavigation: true,
+      slotEntries: entries.filter((entry) => entry.options.id !== "context"),
+      config: { more: ["context"] },
+    },
+    async (f) => {
+      const trigger = "[data-lso-official-trigger]";
+      await f.setEntries(entries);
+      await openNativeMore(f);
+      await f.setActivePanel("context");
+      await f.click(trigger);
+      await f.click(trigger);
+      assert.equal(f.document.querySelector('[role="menu"]'), null);
+      const icon = f.document.querySelector(
+        `${trigger} [data-lso-more-trailing] svg[data-icon="panel-context"]`,
+      );
+      assert.ok(icon);
+      assert.equal(f.document.querySelector('[data-lso-selection="context"]'), null);
+    },
+  ));
+
 test("a selected hidden panel is promoted outside the native More anchor wrapper", async () =>
   using(
     {
       officialMore: true,
-      config: { more: ["context"] },
+      config: { more: ["context"], showCurrentEntry: true },
     },
     async (f) => {
       const hidden = f.document.querySelector(
@@ -344,7 +448,7 @@ test("a selected hidden panel is promoted outside the native More anchor wrapper
 test("More expands in place and restores entry names while the sidebar is open", async () =>
   using(
     {
-      config: { more: ["skills", "context"] },
+      config: { more: ["skills", "context"], moreMode: "click", showCurrentEntry: true },
       hideMoreLabels: true,
     },
     async (f) => {
@@ -406,7 +510,7 @@ test("official More rows replace duplicate clones and keep their pin action", as
       config: { more: ["context", "schedule"] },
     },
     async (f) => {
-      await f.click('nav button[aria-haspopup="menu"]');
+      await openNativeMore(f);
       const menu = f.document.querySelector('[role="menu"]');
       assert.ok(menu, "the official More menu opens");
       assert.equal(
@@ -452,7 +556,7 @@ test("an entry unpinned by the host keeps a clickable sidebar proxy", async () =
       officialMore: true,
       officialMoreEntries: ["context"],
       panelNavigation: true,
-      config: { more: ["context"] },
+      config: { more: ["context"], showCurrentEntry: true },
     },
     async (f) => {
       const native = f.document.querySelector(
@@ -522,7 +626,7 @@ test("the organizer finds a localized panel navigation and pin action", async ()
         ),
         "the panel navigation is found without an English or Chinese label",
       );
-      await f.click('nav button[aria-haspopup="menu"]');
+      await openNativeMore(f);
       const pin = f.document.querySelector(".sidebarEntry .pinButton");
       pin.setAttribute(
         "aria-label",
@@ -577,7 +681,7 @@ test("official pin labels prefer the longest matching entry name", async () => {
       config: { more: ["market", "schedule"] },
     },
     async (f) => {
-      await f.click('nav button[aria-haspopup="menu"]');
+      await openNativeMore(f);
       await f.click(".sidebarEntry .pinButton");
       const saved = JSON.parse(f.window.localStorage.getItem(configKey));
       assert.equal(
@@ -603,7 +707,7 @@ test("a pinwheel icon on a panel row is not mistaken for a pin action", async ()
     {
       slotEntries: [entries[0], market, entries[3]],
       panelNavigation: true,
-      config: { more: ["market"] },
+      config: { more: ["market"], showCurrentEntry: true },
     },
     async (f) => {
       f.document
@@ -632,6 +736,7 @@ test("moving an entry to More delegates to the official unpin action", async () 
   using(
     {
       panelNavigation: true,
+      config: { more: ["skills"], order: ["context", "skills"] },
     },
     async (f) => {
       const target = f.document.querySelector(
@@ -667,6 +772,7 @@ test("moving an entry to More delegates to the official unpin action", async () 
         true,
         "the host action is mirrored into the organizer state",
       );
+      assert.ok(saved.order.indexOf("context") > saved.order.indexOf("skills"));
     },
   ));
 
@@ -790,7 +896,7 @@ test("a transient empty slot snapshot does not erase saved order or More prefere
   ));
 
 test("the promoted hidden panel persists until another entry is selected", async () =>
-  using({ config: { more: ["skills"] } }, async (f) => {
+  using({ config: { more: ["skills"], moreMode: "click", showCurrentEntry: true } }, async (f) => {
     const trigger = f.document.querySelector("[data-lso-trigger]");
     const hidden = f.document.querySelector(
       'nav button[aria-label="技能中心"]',
@@ -890,7 +996,7 @@ test("the promoted hidden panel persists until another entry is selected", async
   }));
 
 test("alternate host selection markers refresh the promoted row", async () =>
-  using({ config: { more: ["skills"] } }, async (f) => {
+  using({ config: { more: ["skills"], showCurrentEntry: true } }, async (f) => {
     const hidden = f.document.querySelector(
       'nav button[aria-label="技能中心"]',
     );
@@ -922,7 +1028,7 @@ test("a promoted rail row keeps its icon width while the hover menu stays readab
   using(
     {
       collapsed: true,
-      config: { more: ["skills"], moreMode: "hover" },
+      config: { more: ["skills"], moreMode: "hover", showCurrentEntry: true },
       hideMoreLabels: true,
     },
     async (f) => {
@@ -984,7 +1090,7 @@ test("moving from More onto the open hover menu keeps it open and Escape collaps
   using(
     {
       collapsed: true,
-      config: { more: ["skills"], moreMode: "hover" },
+      config: { more: ["skills"], moreMode: "hover", showCurrentEntry: true },
       hideMoreLabels: true,
     },
     async (f) => {
@@ -1400,11 +1506,11 @@ test("settings switch the More trigger between click and hover", async () =>
     const hoverMode = () =>
       f.document.querySelector('[data-lso-mode="hover"]');
     assert.equal(
-      clickMode().getAttribute("aria-checked"),
+      hoverMode().getAttribute("aria-checked"),
       "true",
-      "click is the default open mode",
+      "new configurations support click and hover",
     );
-    assert.equal(hoverMode().getAttribute("aria-checked"), "false");
+    assert.equal(clickMode().getAttribute("aria-checked"), "false");
     await act(async () => hoverMode().click());
     assert.equal(
       JSON.parse(f.window.localStorage.getItem(configKey)).moreMode,
@@ -1418,6 +1524,13 @@ test("settings switch the More trigger between click and hover", async () =>
       "click",
     );
     assert.equal(clickMode().getAttribute("aria-checked"), "true");
+  }));
+
+test("a stored click-only preference wins over the new default", async () =>
+  using({ config: { moreMode: "click" } }, async (f) => {
+    await f.settings();
+    const preference = f.document.querySelector('[data-lso-mode="click"]');
+    assert.equal(preference.getAttribute("aria-checked"), "true");
   }));
 
 test("settings reject duplicate shortcuts, report the conflict, and accept arrow shortcuts", async () =>
@@ -1643,6 +1756,47 @@ test("custom links participate in More ordering and can be reordered by dragging
       assert.ok(order.indexOf("link-b") < order.indexOf("link-a"));
     },
   ));
+
+test("editing and backing up a link preserves its identity and shortcut", async () =>
+  using({
+    config: {
+      order: ["link-docs", "skills"],
+      more: ["skills"],
+      shortcuts: { "link-docs": "Ctrl+Shift+D" },
+      links: [{ id: "link-docs", label: "文档", url: "https://example.com" }],
+    },
+  }, async (f) => {
+    const saved = () => JSON.parse(f.window.localStorage.getItem(configKey));
+    const propsOf = (element) =>
+      element[Object.keys(element).find((key) => key.startsWith("__reactProps"))];
+    f.window.confirm = () => true;
+    await f.settings();
+    f.document.querySelector(".lso-link-form input").focus = () => {};
+    f.document.querySelector(".lso-backup-text").focus = () => {};
+    await f.click('button[aria-label="编辑链接 文档"]');
+    const name = f.document.querySelector(".lso-link-form input");
+    const destination = f.document.querySelector(".lso-link-form select");
+    await act(async () => {
+      propsOf(name).onChange({ target: { value: "项目文档" } });
+      propsOf(destination).onChange({ target: { value: "builtin" } });
+    });
+    await f.click('.lso-link-form button[type="submit"]');
+    assert.deepEqual(saved().links[0], {
+      id: "link-docs", label: "项目文档", url: "https://example.com", open: "builtin",
+    });
+    assert.equal(saved().order[0], "link-docs");
+    assert.equal(saved().shortcuts["link-docs"], "Ctrl+Shift+D");
+
+    const actions = ".lso-backup-actions button:nth-child";
+    await f.click(`${actions}(1)`);
+    const backup = JSON.parse(f.document.querySelector(".lso-backup-text").value);
+    assert.deepEqual(backup.preferences, saved());
+    await f.click(`${actions}(3)`);
+    assert.deepEqual(saved().links, []);
+    assert.deepEqual(saved().more, []);
+    await f.click(`${actions}(2)`);
+    assert.deepEqual(saved(), backup.preferences);
+  }));
 
 test("the link editor enforces and explains its storage limit", async () =>
   using(
