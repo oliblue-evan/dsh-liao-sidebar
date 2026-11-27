@@ -309,7 +309,14 @@ test("real Chromium renders the card-based settings layout and reflows on narrow
         html,body{margin:0;background:#151517;color:#f5f5f7;font:14px/1.5 -apple-system,sans-serif}body{padding:24px}#settings{max-width:800px;margin:0 auto}
       </style><style>${settingsCss}</style></head><body><main id="settings">${settingsMarkup}</main></body></html>`);
 
+    const entries = page.locator(".lso-entry-section");
+    const entrySummary = entries.locator(":scope > summary");
+    assert.equal(await entries.getAttribute("open"), null);
+    await entrySummary.click();
     await page.waitForSelector(".lso-entry-row");
+    const links = page.locator(".lso-entry-tools");
+    await links.locator("summary").click();
+    assert.equal(await links.getAttribute("open"), "");
     assert.equal(
       await page.locator('[data-lso-sort-id="link-docs"]').count(),
       1,
@@ -322,18 +329,18 @@ test("real Chromium renders the card-based settings layout and reflows on narrow
     );
     assert.equal(
       await page.locator(".lso-settings-section").count(),
-      6,
-      "display, entries, links, and backup have separate settings sections",
+      3,
+      "preview, entry management, and utilities each have a card",
     );
     const layout = await page.evaluate(() => {
       const settings = document.querySelector(".lso-settings");
       const section = document.querySelector(".lso-settings-section");
-      const row = document.querySelector(".lso-entry-row");
+      const list = document.querySelector(".lso-settings-list");
       const form = document.querySelector(".lso-link-form");
       return {
         sectionBackground: getComputedStyle(section).backgroundColor,
         sectionRadius: getComputedStyle(section).borderRadius,
-        rowColumns: getComputedStyle(row).gridTemplateColumns.split(" ").length,
+        rowColumns: getComputedStyle(list).gridTemplateColumns.split(" ").length,
         formColumns: getComputedStyle(form).gridTemplateColumns.split(" ")
           .length,
         settingsWidth: settings.getBoundingClientRect().width,
@@ -371,9 +378,12 @@ test("real Chromium renders the card-based settings layout and reflows on narrow
       "the inline shortcut control keeps entry rows compact",
     );
 
-    const links = page.locator("details").filter({ has: page.locator(".lso-link-form") });
+    const backup = page.locator(".lso-backup");
+    await backup.locator("summary").click();
+    const backupText = backup.locator("textarea");
+    assert.ok(await backupText.isVisible());
+    assert.ok((await backupText.boundingBox()).width > layout.settingsWidth * 0.8);
     await links.locator("summary").click();
-    assert.equal(await links.getAttribute("open"), "");
     if (process.env.LSO_SCREENSHOT)
       await page.screenshot({
         path: process.env.LSO_SCREENSHOT,
@@ -381,10 +391,11 @@ test("real Chromium renders the card-based settings layout and reflows on narrow
       });
 
     await page.setViewportSize({ width: 360, height: 900 });
+    await links.locator("summary").click();
     await page.waitForTimeout(80);
     const narrow = await page.evaluate(() => ({
       rowColumns: getComputedStyle(
-        document.querySelector(".lso-entry-row"),
+        document.querySelector(".lso-settings-list"),
       ).gridTemplateColumns.split(" ").length,
       formColumns: getComputedStyle(
         document.querySelector(".lso-link-form"),
@@ -394,6 +405,9 @@ test("real Chromium renders the card-based settings layout and reflows on narrow
     assert.equal(narrow.rowColumns, 1);
     assert.equal(narrow.formColumns, 1);
     assert.ok(narrow.overflow <= 0, "settings do not overflow a 360px viewport");
+    await entrySummary.click();
+    assert.equal(await entries.getAttribute("open"), null);
+    assert.equal(await page.locator(".lso-settings-list").isVisible(), false);
   } finally {
     await browser.close();
   }

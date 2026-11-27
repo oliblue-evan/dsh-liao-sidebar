@@ -54,15 +54,15 @@ test("collapsed hover preview uses the real sidebar and restores the collapsed s
       ["打开侧边栏", "新建会话"],
       "both host controls are cloned before the host removes them",
     );
-    assert.match(f.document.querySelector("[data-lso-style]").textContent,
-      /\[data-lso-peek\] \[data-lso-peek-column\]\{[^}]*inset:0 auto 0 0!important;[^}]*height:100%!important/);
+    assert.equal(f.frame.style.getPropertyValue("--lso-peek-x"), "");
+    assert.equal(f.frame.style.getPropertyValue("--lso-peek-y"), "43px");
     assert.equal(f.toggles(), 1);
     assert.equal(f.collapsed(), false);
 
     f.document.body.dispatchEvent(
       new f.window.MouseEvent("pointermove", { bubbles: true }),
     );
-    await sleep(220);
+    await sleep(350);
     await f.flush();
     assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
     assert.equal(f.column.hasAttribute("data-lso-peek-column"), false);
@@ -161,7 +161,7 @@ test("preview preserves the collapsed titlebar clearance", async () => {
     f.document.body.dispatchEvent(
       new f.window.MouseEvent("pointermove", { bubbles: true }),
     );
-    await sleep(220);
+    await sleep(350);
     await f.flush();
     assert.equal(
       f.frame.style.getPropertyValue("--dsh-frame-leading-clearance"),
@@ -222,7 +222,7 @@ test("the floating sidebar keeps its native width on narrow windows", async () =
     await f.flush();
     assert.equal(
       f.frame.style.getPropertyValue("--lso-peek-width"),
-      "260px",
+      "236px",
       "the preview narrows to fit a viewport smaller than the sidebar",
     );
   } finally {
@@ -230,7 +230,7 @@ test("the floating sidebar keeps its native width on narrow windows", async () =
   }
 });
 
-test("preview slides in from the left and exits beyond the edge", async () => {
+test("preview fades in beneath the opener and stays mounted until its exit completes", async () => {
   const f = await fixture({ collapsed: true });
   const animations = [];
   try {
@@ -258,16 +258,16 @@ test("preview slides in from the left and exits beyond the edge", async () => {
     await f.flush();
 
     assert.equal(animations.length, 1);
-    assert.equal(animations[0].options.duration, 180);
-    assert.equal(animations[0].frames[0].translate, "-100% 0px");
+    assert.equal(animations[0].frames[0].translate, "0px -6px");
+    assert.equal(animations[0].frames[0].opacity, 0);
 
     f.document.body.dispatchEvent(
       new f.window.MouseEvent("pointermove", { bubbles: true }),
     );
-    await sleep(220);
+    await sleep(350);
     assert.equal(animations.length, 2);
-    assert.equal(animations[1].options.duration, 120);
-    assert.equal(animations[1].frames[1].translate, "-100% 0px");
+    assert.equal(animations[1].frames[1].translate, "0px -4px");
+    assert.equal(animations[1].frames[1].opacity, 0);
     assert.equal(
       f.column.hasAttribute("data-lso-peek-closing"),
       true,
@@ -305,7 +305,7 @@ test("closing the preview keeps the rail gutter and covers the collapse", async 
     f.document.body.dispatchEvent(
       new f.window.MouseEvent("pointermove", { bubbles: true }),
     );
-    await sleep(220);
+    await sleep(350);
     assert.equal(f.frame.hasAttribute("data-lso-peek"), false);
     assert.equal(f.collapsed(), true, "the host is collapsed again");
     assert.ok(
